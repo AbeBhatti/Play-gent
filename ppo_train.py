@@ -88,15 +88,17 @@ def main() -> None:
     dataset = Dataset.from_dict({"prompt": prompts, "reward": base_rewards})
     print(f"Dataset size: {len(dataset)} examples")
 
-    # Custom reward function for GRPO: reward model only (no random env noise).
+    # Custom reward function for GRPO: reward model + repetition & length penalties.
     def reward_fn(completions: List[str], prompts: List[str], **kwargs) -> List[float]:
         """
-        Score each completion using the reward model encoder + head only.
-        Deterministic and low-noise compared to environment-based rewards.
+        Score each completion with reward model, then apply repetition and length penalties.
         """
         scores: List[float] = []
-        for i, completion in enumerate(completions):
+        for completion in completions:
             text = completion.strip()
+            words = text.split()
+
+            # Reward model score
             inputs = reward_tokenizer(
                 text,
                 return_tensors="pt",
@@ -108,10 +110,26 @@ def main() -> None:
 
             with torch.no_grad():
                 hidden = reward_model.encoder(**inputs).last_hidden_state[:, 0, :]
-                score = reward_model.head(hidden).squeeze().item()
+                rm_score = reward_model.head(hidden).squeeze().item()
 
-            print(f"Completion {i}: score={score:.4f} | text={completion[:50]}")
-            scores.append(torch.tensor(score, dtype=torch.float32))
+            # Repetition penalty — unique words ratio
+            if len(words) > 0:
+                unique_ratio = len(set(words)) / len(words)
+            else:
+                unique_ratio = 0.0
+
+            if unique_ratio < 0.3:
+                repetition_penalty = -2.0
+            elif unique_ratio < 0.5:
+                repetition_penalty = -0.5
+            else:
+                repetition_penalty = 0.0
+
+            # Penalty for very short completions
+            length_penalty = -0.5 if len(words) < 5 else 0.0
+
+            combined = float(rm_score) + repetition_penalty + length_penalty
+            scores.append(torch.tensor(combined, dtype=torch.float32))
         return scores
 
     # GRPO configuration: small batch, multiple generations per prompt.
