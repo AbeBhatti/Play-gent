@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.pyc
+*.pth
+wandb/
+grpo_output/
+*.pt
+selfplay_states.json
+selfplay_states_test.json
+*.png
+.env
+HF_TOKEN

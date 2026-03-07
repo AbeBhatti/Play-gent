@@ -1,0 +1,6 @@
+sentence-transformers
+torch
+numpy
+tqdm
+Diplomacy
+uuid
