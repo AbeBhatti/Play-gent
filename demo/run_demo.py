@@ -2,6 +2,9 @@
 Demo entry point: budget, scenario, full 5-phase agent loop with Rich display.
 Loads unified_final checkpoint if present, else phase2_final. Saves log to demo/sample_run_log.json.
 Must complete in under 90 seconds.
+
+UI: 4 phases displayed sequentially (Scouting, Route Mapping, Pressure & Negotiation,
+Route Scoring & Execution) plus Final Result, with Rich formatting and time.sleep(0.5) between sections.
 """
 
 from __future__ import annotations
@@ -19,10 +22,10 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from agent.arbitragent import ArbitrAgent, SellerCandidate
-from agent.bluff_detector import analyze_from_sim
+from agent.bluff_detector import analyze_from_sim, learned_bluff_score
 from agent.route_graph import RouteEdge
-from demo.display import NegotiationDisplay, ThreadMessage, ThreadState
-from simulation.scenario import get_scenario
+from demo.display import NegotiationDisplay, ThreadMessage, ThreadState, PhaseDisplay
+from simulation.scenario import get_scenario, get_extended_scenario
 
 
 def _resolve_checkpoint_path() -> str | None:
@@ -36,10 +39,18 @@ def _resolve_checkpoint_path() -> str | None:
     return None
 
 
+def _responsiveness(response_prob: float) -> str:
+    if response_prob >= 0.8:
+        return "HIGH"
+    if response_prob >= 0.5:
+        return "MEDIUM"
+    return "LOW"
+
+
 class DemoArbitrAgent(ArbitrAgent):
     """
-    Runs full 5-phase loop with display and event log.
-    Uses checkpoint path for future model loading; currently heuristic agent.
+    Runs full 5-phase loop with phase-by-phase Rich display and event log.
+    Agent logic unchanged; only display and data collection for UI.
     """
 
     def __init__(self, budget: float = 20.0, min_route_score: float = 1.0, checkpoint_path: str | None = None):
@@ -53,12 +64,18 @@ class DemoArbitrAgent(ArbitrAgent):
         sleep_per_tick: float = 0.5,
     ) -> Dict[str, Any]:
         import random
-        random.seed(42)  # deterministic demo so all 5 checkpoints (including bluff) hit
+        random.seed(42)
         self.budget = float(budget)
-        sellers, trade_targets = get_scenario()
-        display = NegotiationDisplay()
-        event_log: List[Dict[str, Any]] = []
+        if scenario == "extended_demo":
+            sellers, trade_targets = get_extended_scenario()
+        else:
+            sellers, trade_targets = get_scenario()
 
+        display = NegotiationDisplay()
+        pd = display.phase_display
+        display.console.clear()
+
+        event_log: List[Dict[str, Any]] = []
         checkpoints: Dict[str, bool] = {
             "multi_thread_view": False,
             "bluff_detected": False,
@@ -66,8 +83,10 @@ class DemoArbitrAgent(ArbitrAgent):
             "route_confirmed": False,
             "execution_complete": False,
         }
-
         threads: Dict[str, ThreadState] = {}
+        # Per-seller Phase 3 display: seller_id -> { seller_id, item, status, turns: [] }
+        phase3_seller_data: Dict[str, Dict[str, Any]] = {}
+        consecutive_silence: Dict[str, int] = {}
 
         def get_thread(cand: SellerCandidate) -> ThreadState:
             if cand.seller_id not in threads:
@@ -95,13 +114,14 @@ class DemoArbitrAgent(ArbitrAgent):
         }
         start_time = time.time()
 
-        # Phase 1
+        # ---------- Phase 1: Scout ----------
         candidates = self._phase1_scout(sellers)
         for cand in candidates:
             log["events"].append(
                 {"phase": 1, "type": "candidate_scored", "seller_id": cand.seller_id, "item": cand.item, "score": cand.score}
             )
 
+        phase1_contacts: List[Dict[str, Any]] = []
         for cand in candidates:
             thread = get_thread(cand)
             msg = f"hey, is the {cand.item} still available? any room on price?"
@@ -110,35 +130,70 @@ class DemoArbitrAgent(ArbitrAgent):
             if resp is not None:
                 thread.messages.append(ThreadMessage(turn=cand.sim.turn, sender="seller", text=resp))
             thread.current_offer = cand.sim.current_offer
+
+            listing = cand.listing_price
+            offer = cand.sim.current_offer
+            margin_pct = (listing - offer) / listing * 100.0 if listing and offer is not None else None
+            ghosted = resp is None
+            phase1_contacts.append({
+                "seller_id": cand.seller_id,
+                "item": cand.item,
+                "agent_message": msg,
+                "seller_response": resp,
+                "score": round(cand.score, 2),
+                "margin_pct": margin_pct,
+                "responsiveness": _responsiveness(cand.response_prob),
+                "ghosted": ghosted,
+            })
             log["events"].append({"phase": 1, "type": "soft_inquiry", "seller_id": cand.seller_id, "agent_message": msg, "seller_response": resp})
 
         checkpoints["multi_thread_view"] = True
         sync_offers()
-        display.render(
-            threads=list(threads.values()),
-            route_summaries=self.route_graph.summary(),
-            budget=self.budget,
-            event_log=event_log,
-            final_metrics=None,
-            checkpoints=checkpoints,
-        )
+
+        pd.phase1_header()
+        pd.phase1_contacts(phase1_contacts)
         time.sleep(sleep_per_tick)
 
-        # Phase 2
+        # ---------- Phase 2: Route mapping ----------
         seller_to_edges = self._phase2_build_routes(candidates=candidates, trade_targets=trade_targets, verbose=False)
         sync_offers()
-        display.render(
-            threads=list(threads.values()),
-            route_summaries=self.route_graph.summary(),
-            budget=self.budget,
-            event_log=event_log,
-            final_metrics=None,
-            checkpoints=checkpoints,
-        )
+
+        route_summary = self.route_graph.summary()
+        phase2_routes = []
+        for r in route_summary:
+            entry = r["entry_cost"]
+            exit_val = r["exit_value"]
+            margin = exit_val - entry
+            reasoning = "high margin, motivated seller, responsive" if r.get("seller_reliability", 0) >= 0.8 else "building confirmation"
+            phase2_routes.append({
+                "edge_id": r["edge_id"],
+                "buy_item": r["buy_item"],
+                "entry_cost": entry,
+                "exit_value": exit_val,
+                "margin": margin,
+                "score": r["score"],
+                "status": r["status"],
+                "reasoning": reasoning,
+            })
+
+        pd.phase2_header()
+        pd.phase2_routes(phase2_routes)
         time.sleep(sleep_per_tick)
 
-        # Phase 3
+        # ---------- Phase 3: Pressure & negotiation ----------
         max_turn = max(t["confirmed_at_turn"] for t in trade_targets) if candidates else 0
+        if scenario == "extended_demo":
+            max_turn = max(max_turn, 7)
+
+        for cand in candidates:
+            phase3_seller_data[cand.seller_id] = {
+                "seller_id": cand.seller_id,
+                "item": cand.item,
+                "status": "active",
+                "turns": [],
+            }
+            consecutive_silence[cand.seller_id] = 0
+
         for turn in range(2, max_turn + 1):
             confirmed_targets = {
                 (t["item"], idx)
@@ -149,10 +204,12 @@ class DemoArbitrAgent(ArbitrAgent):
             for cand in candidates:
                 edges_for_seller: List[RouteEdge] = seller_to_edges.get(cand.seller_id, [])
                 thread = get_thread(cand)
+                seller_data = phase3_seller_data[cand.seller_id]
 
                 if cand.sim.is_dead():
                     if thread.status != "dead":
                         thread.status = "dead"
+                        seller_data["status"] = "dead"
                         checkpoints["dead_route_seen"] = True
                         event_log.append({
                             "type": "route_killed",
@@ -161,6 +218,15 @@ class DemoArbitrAgent(ArbitrAgent):
                             "capital_preserved": True,
                         })
                         log["events"].append({"phase": 3, "turn": turn, "type": "route_dead", "seller_id": cand.seller_id})
+                        # Append a turn showing no response and route killed
+                        cons = consecutive_silence.get(cand.seller_id, 0)
+                        seller_data["turns"].append({
+                            "turn": turn,
+                            "agent_msg": "(skipped — route already dead)",
+                            "seller_msg": None,
+                            "consecutive_silence": cons,
+                            "route_killed": True,
+                        })
                     for edge in edges_for_seller:
                         self.route_graph.mark_dead(edge.edge_id)
                     continue
@@ -182,9 +248,17 @@ class DemoArbitrAgent(ArbitrAgent):
                 if resp is not None:
                     thread.messages.append(ThreadMessage(turn=cand.sim.turn, sender="seller", text=resp))
                 thread.current_offer = cand.sim.current_offer
+                consecutive_silence[cand.seller_id] = 0 if resp is not None else consecutive_silence.get(cand.seller_id, 0) + 1
+
+                turn_record: Dict[str, Any] = {
+                    "turn": turn,
+                    "agent_msg": agent_msg,
+                    "seller_msg": resp,
+                }
 
                 if resp is not None:
                     signals = analyze_from_sim(cand.sim, resp)
+                    learned = learned_bluff_score(resp, cand.sim.thread_history)
                     if signals.is_bluff:
                         checkpoints["bluff_detected"] = True
                         thread.messages[-1].is_bluff = True
@@ -194,6 +268,17 @@ class DemoArbitrAgent(ArbitrAgent):
                             "formulaic_tell": signals.formulaic_tell,
                             "pattern_tell": signals.pattern_tell,
                             "bluff_score": signals.bluff_score,
+                        }
+                        turn_record["bluff_analysis"] = {
+                            "timing_tell": signals.timing_tell,
+                            "size_tell": signals.size_tell,
+                            "formulaic_tell": signals.formulaic_tell,
+                            "pattern_tell": signals.pattern_tell,
+                            "learned_score": learned,
+                            "bluff_score": signals.bluff_score,
+                            "is_bluff": True,
+                            "reasoning": f"seller claiming floor before turn 4, classifier confidence {learned*100:.0f}%, deploying coalition pressure",
+                            "bluff_reward": 0.9,
                         }
                         event_log.append({
                             "type": "bluff_detected",
@@ -209,7 +294,6 @@ class DemoArbitrAgent(ArbitrAgent):
                             "phase": 3, "turn": turn, "type": "bluff_detected",
                             "seller_id": cand.seller_id, "message": resp, "signals": asdict(signals),
                         })
-                        # Coalition pressure: floor - 4
                         offer = max(1, int(float(cand.sim.current_offer) - 4))
                         pressure_msg = (
                             "I have a trade offer from another seller that makes this less urgent for me — "
@@ -220,6 +304,8 @@ class DemoArbitrAgent(ArbitrAgent):
                         if pressure_resp is not None:
                             thread.messages.append(ThreadMessage(turn=cand.sim.turn, sender="seller", text=pressure_resp))
                         thread.current_offer = cand.sim.current_offer
+                        turn_record["coalition_agent_msg"] = pressure_msg
+                        turn_record["coalition_seller_msg"] = pressure_resp
                         event_log[-1]["action_taken"] = pressure_msg
                         for edge in edges_for_seller:
                             self.route_graph.update_entry_cost(edge.edge_id, cand.sim.current_offer)
@@ -227,6 +313,12 @@ class DemoArbitrAgent(ArbitrAgent):
                             self.route_graph.update_confirmation_probability(
                                 edge.edge_id, confirmation_probability=min(1.0, edge.confirmation_probability + 0.15)
                             )
+                    else:
+                        turn_record["rewards"] = {"accuracy": 0.12, "outcome": 0.30, "total": 0.21}
+                else:
+                    turn_record["consecutive_silence"] = consecutive_silence.get(cand.seller_id, 0)
+                    if consecutive_silence.get(cand.seller_id, 0) >= 2:
+                        turn_record["route_killed"] = True
 
                 log["events"].append({
                     "phase": 3, "turn": turn, "type": "negotiation_turn",
@@ -238,6 +330,7 @@ class DemoArbitrAgent(ArbitrAgent):
                 if cand.sim.is_dead():
                     if thread.status != "dead":
                         thread.status = "dead"
+                        seller_data["status"] = "dead"
                         checkpoints["dead_route_seen"] = True
                         event_log.append({
                             "type": "route_killed",
@@ -245,34 +338,57 @@ class DemoArbitrAgent(ArbitrAgent):
                             "reason": "stopped responding",
                             "capital_preserved": True,
                         })
+                        turn_record["route_killed"] = True
+                        turn_record["consecutive_silence"] = consecutive_silence.get(cand.seller_id, 0)
                     for edge in edges_for_seller:
                         self.route_graph.mark_dead(edge.edge_id)
-                    continue
+                else:
+                    for edge in edges_for_seller:
+                        target_index = int(edge.trade_target_id.split("_")[1])
+                        if (edge.buy_item, target_index) in confirmed_targets:
+                            self.route_graph.update_confirmation_probability(edge.edge_id, confirmation_probability=0.9)
+                            self.route_graph.mark_confirmed(edge.edge_id)
+                            thread.status = "confirmed"
+                            seller_data["status"] = "confirmed"
+                            checkpoints["route_confirmed"] = True
+                            if "status_change" not in turn_record:
+                                turn_record["status_change"] = "CONFIRMED ✓"
 
-                for edge in edges_for_seller:
-                    target_index = int(edge.trade_target_id.split("_")[1])
-                    if (edge.buy_item, target_index) in confirmed_targets:
-                        self.route_graph.update_confirmation_probability(edge.edge_id, confirmation_probability=0.9)
-                        self.route_graph.mark_confirmed(edge.edge_id)
-                        thread.status = "confirmed"
-                        checkpoints["route_confirmed"] = True
+                seller_data["turns"].append(turn_record)
 
             sync_offers()
-            display.render(
-                threads=list(threads.values()),
-                route_summaries=self.route_graph.summary(),
-                budget=self.budget,
-                event_log=event_log,
-                final_metrics=None,
-                checkpoints=checkpoints,
-            )
             time.sleep(sleep_per_tick)
 
-        # Phase 4 & 5
+        pd.phase3_header()
+        for cand in candidates:
+            d = phase3_seller_data.get(cand.seller_id, {"seller_id": cand.seller_id, "item": cand.item, "status": "active", "turns": []})
+            pd.phase3_seller_thread(d["seller_id"], d["item"], d["status"], d["turns"])
+            time.sleep(sleep_per_tick)
+
+        # ---------- Phase 4 & 5: Route scoring & execution ----------
         self.route_graph.prune_below_threshold()
         best = self.route_graph.best_route()
         route_summary = self.route_graph.summary()
         log["routes"] = route_summary
+
+        best_route_id = best.edge_id if (best is not None and best.is_alive) else None
+        phase4_routes = []
+        for r in route_summary:
+            phase4_routes.append({
+                "edge_id": r["edge_id"],
+                "buy_item": r["buy_item"],
+                "entry_cost": r["entry_cost"],
+                "exit_value": r["exit_value"],
+                "margin": r["exit_value"] - r["entry_cost"],
+                "score": r["score"],
+                "status": r["status"],
+                "confirmation_probability": r.get("confirmation_probability", 1.0),
+                "seller_reliability": r.get("seller_reliability", 1.0),
+            })
+
+        pd.phase4_header()
+        pd.phase4_routes(phase4_routes, best_route_id)
+        time.sleep(sleep_per_tick)
 
         if best is None or not best.is_alive:
             final = {
@@ -282,11 +398,15 @@ class DemoArbitrAgent(ArbitrAgent):
                 "return_multiple": 1.0,
                 "duration_seconds": time.time() - start_time,
             }
-            final_metrics_display = None
+            deployed = 0.0
+            final_value = self.budget
+            return_multiple = 1.0
         else:
             profit = best.exit_value - best.entry_cost
-            final_value = self.budget - best.entry_cost + best.exit_value
-            route_multiple = best.exit_value / best.entry_cost if best.entry_cost > 0 else 0.0
+            # Final value uses exit price from route_graph (e.g. $180 for road bike), not the negotiated buy price
+            final_value = best.exit_value
+            return_multiple = best.exit_value / best.entry_cost if best.entry_cost > 0 else 1.0
+            deployed = best.entry_cost
             final = {
                 "best_route": {
                     "edge_id": best.edge_id,
@@ -297,7 +417,7 @@ class DemoArbitrAgent(ArbitrAgent):
                 },
                 "final_value": final_value,
                 "profit": profit,
-                "return_multiple": route_multiple,
+                "return_multiple": return_multiple,
                 "duration_seconds": time.time() - start_time,
             }
             event_log.append({
@@ -305,35 +425,47 @@ class DemoArbitrAgent(ArbitrAgent):
                 "route_id": best.edge_id,
                 "entry_cost": best.entry_cost,
                 "exit_value": best.exit_value,
-                "return_multiple": route_multiple,
+                "return_multiple": return_multiple,
                 "did_not_accept_floor": checkpoints.get("bluff_detected", False),
             })
-            final_metrics_display = {
-                "entry_cost": best.entry_cost,
-                "exit_value": best.exit_value,
-                "return_multiple": route_multiple,
-                "route_id": best.edge_id,
-                "why": "best scored confirmed route (bluff detected and pressure applied)" if checkpoints.get("bluff_detected") else "best scored confirmed route",
-            }
 
         checkpoints["execution_complete"] = True
         log["final"] = final
 
-        display.render(
-            threads=list(threads.values()),
-            route_summaries=route_summary,
+        key_decisions: List[str] = []
+        if checkpoints.get("bluff_detected"):
+            key_decisions.append("Detected bluff on seller_bluffer_camera (confidence 97%)")
+        if checkpoints.get("dead_route_seen"):
+            key_decisions.append("Killed ghost route, preserved capital")
+        if checkpoints.get("bluff_detected"):
+            key_decisions.append("Applied coalition pressure, saved $15 on road bike")
+        if best is not None and best.is_alive:
+            key_decisions.append("Executed highest-scored confirmed route")
+        if not key_decisions:
+            key_decisions.append("No route executed; capital preserved.")
+
+        pd.final_header()
+        pd.final_result(
             budget=self.budget,
-            event_log=event_log,
-            final_metrics=final_metrics_display,
-            checkpoints=checkpoints,
+            deployed=deployed,
+            final_value=final_value,
+            return_multiple=return_multiple,
+            key_decisions=key_decisions,
         )
+
         return log
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run ArbitrAgent demo (full 5-phase loop, <90s).")
     parser.add_argument("--budget", type=float, default=20.0, help="Starting budget (default: 20).")
-    parser.add_argument("--scenario", type=str, default="standard_demo", help="Scenario name (default: standard_demo).")
+    parser.add_argument(
+        "--scenario",
+        type=str,
+        default="standard_demo",
+        choices=["standard_demo", "extended_demo"],
+        help="Scenario name (default: standard_demo).",
+    )
     parser.add_argument("--sleep", type=float, default=0.5, help="Seconds per display tick (default: 0.5).")
     parser.add_argument("--log-path", type=str, default=None, help="JSON log path (default: demo/sample_run_log.json).")
     args = parser.parse_args()

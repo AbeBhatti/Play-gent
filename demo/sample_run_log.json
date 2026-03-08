@@ -8,35 +8,35 @@
       "type": "candidate_scored",
       "seller_id": "seller_motivated_001",
       "item": "road bike",
-      "score": 0.73
+      "score": 0.6890909090909092
     },
     {
       "phase": 1,
       "type": "candidate_scored",
       "seller_id": "seller_bluffer_camera",
       "item": "vintage film camera",
-      "score": 0.49
+      "score": 0.47818181818181815
     },
     {
       "phase": 1,
       "type": "candidate_scored",
       "seller_id": "seller_ghoster_001",
       "item": "leather jacket",
-      "score": 0.3575
+      "score": 0.3359090909090909
     },
     {
       "phase": 1,
       "type": "soft_inquiry",
       "seller_id": "seller_motivated_001",
       "agent_message": "hey, is the road bike still available? any room on price?",
-      "seller_response": "best i can do is $118"
+      "seller_response": "meet me at 118"
     },
     {
       "phase": 1,
       "type": "soft_inquiry",
       "seller_id": "seller_bluffer_camera",
       "agent_message": "hey, is the vintage film camera still available? any room on price?",
-      "seller_response": "best i can do is $42"
+      "seller_response": "cant do it for less than 42"
     },
     {
       "phase": 1,
@@ -51,7 +51,22 @@
       "type": "negotiation_turn",
       "seller_id": "seller_motivated_001",
       "agent_message": "just checking back on the road bike \u2014 any flexibility on your price at all?",
-      "seller_response": "best i can do is $111"
+      "seller_response": "meet me at 111"
+    },
+    {
+      "phase": 3,
+      "turn": 2,
+      "type": "bluff_detected",
+      "seller_id": "seller_bluffer_camera",
+      "message": "been getting interest at 40, cant go lower",
+      "signals": {
+        "timing_tell": 1.0,
+        "size_tell": 1.0,
+        "formulaic_tell": 1.0,
+        "pattern_tell": 0.0,
+        "bluff_score": 0.8805482625961304,
+        "is_bluff": true
+      }
     },
     {
       "phase": 3,
@@ -59,7 +74,7 @@
       "type": "negotiation_turn",
       "seller_id": "seller_bluffer_camera",
       "agent_message": "just checking back on the vintage film camera \u2014 any flexibility on your price at all?",
-      "seller_response": "best i can do is $36"
+      "seller_response": "been getting interest at 40, cant go lower"
     },
     {
       "phase": 3,
@@ -75,7 +90,7 @@
       "type": "negotiation_turn",
       "seller_id": "seller_motivated_001",
       "agent_message": "i have another buyer interested in the road bike, but i'd prefer to buy from you if we can make the numbers work. could you do a bit better on price?",
-      "seller_response": "best i can do is $109"
+      "seller_response": null
     },
     {
       "phase": 3,
@@ -84,11 +99,11 @@
       "seller_id": "seller_bluffer_camera",
       "message": "look i really cant go lower than $30, thats my final offer. been getting a lot of interest so",
       "signals": {
-        "timing_tell": 1.0,
+        "timing_tell": 0.7,
         "size_tell": 1.0,
         "formulaic_tell": 1.0,
         "pattern_tell": 1.0,
-        "bluff_score": 0.9911464929580689,
+        "bluff_score": 0.9656329703330995,
         "is_bluff": true
       }
     },
@@ -114,7 +129,7 @@
       "type": "negotiation_turn",
       "seller_id": "seller_motivated_001",
       "agent_message": "i have another buyer interested in the road bike, but i'd prefer to buy from you if we can make the numbers work. could you do a bit better on price?",
-      "seller_response": "best i can do is $103"
+      "seller_response": null
     },
     {
       "phase": 3,
@@ -127,7 +142,7 @@
         "size_tell": 1.0,
         "formulaic_tell": 1.0,
         "pattern_tell": 1.0,
-        "bluff_score": 0.9611464929580689,
+        "bluff_score": 0.9656329703330995,
         "is_bluff": true
       }
     },
@@ -145,7 +160,7 @@
       "type": "negotiation_turn",
       "seller_id": "seller_motivated_001",
       "agent_message": "i have another buyer interested in the road bike, but i'd prefer to buy from you if we can make the numbers work. could you do a bit better on price?",
-      "seller_response": null
+      "seller_response": "i could do 105"
     },
     {
       "phase": 3,
@@ -158,7 +173,7 @@
         "size_tell": 1.0,
         "formulaic_tell": 1.0,
         "pattern_tell": 1.0,
-        "bluff_score": 0.9611464929580689,
+        "bluff_score": 0.9656329703330995,
         "is_bluff": true
       }
     },
@@ -177,36 +192,36 @@
       "buy_seller_id": "seller_motivated_001",
       "buy_item": "road bike",
       "trade_target_id": "buyer_2_road_bike",
-      "entry_cost": 103.0,
+      "entry_cost": 105.0,
       "exit_value": 180.0,
       "status": "confirmed",
       "confirmation_probability": 1.0,
       "seller_reliability": 0.9,
-      "score": 69.3
+      "score": 67.5
     },
     {
       "edge_id": "route_2",
       "buy_seller_id": "seller_bluffer_camera",
       "buy_item": "vintage film camera",
       "trade_target_id": "buyer_0_vintage_film_camera",
-      "entry_cost": 36.0,
+      "entry_cost": 40.0,
       "exit_value": 52.0,
       "status": "confirmed",
       "confirmation_probability": 1.0,
       "seller_reliability": 0.85,
-      "score": 13.6
+      "score": 10.2
     },
     {
       "edge_id": "route_3",
       "buy_seller_id": "seller_bluffer_camera",
       "buy_item": "vintage film camera",
       "trade_target_id": "buyer_1_vintage_film_camera",
-      "entry_cost": 36.0,
+      "entry_cost": 40.0,
       "exit_value": 48.0,
       "status": "confirmed",
       "confirmation_probability": 1.0,
       "seller_reliability": 0.85,
-      "score": 10.2
+      "score": 6.8
     }
   ],
   "final": {
@@ -214,13 +229,13 @@
       "edge_id": "route_1",
       "buy_seller_id": "seller_motivated_001",
       "trade_target_id": "buyer_2_road_bike",
-      "entry_cost": 103.0,
+      "entry_cost": 105.0,
       "exit_value": 180.0
     },
-    "final_value": 97.0,
-    "profit": 77.0,
-    "return_multiple": 1.7475728155339805,
-    "duration_seconds": 5.846658706665039
+    "final_value": 180.0,
+    "profit": 75.0,
+    "return_multiple": 1.7142857142857142,
+    "duration_seconds": 8.120891094207764
   },
   "checkpoints": {
     "multi_thread_view": true,

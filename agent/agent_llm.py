@@ -119,14 +119,23 @@ class AgentLLM:
         result = self.generate(prompt, max_tokens=40)
         return self._clean(result, f"hey, is the {item} still available? any room on price?")
 
-    def pressure_message(self, item: str, current_offer: float) -> str:
-        """Follow-up pressure message when seller hasn't moved much."""
+    def pressure_message(self, item: str, current_offer: float, turn: int = 0) -> str:
+        """Follow-up pressure message when seller hasn't moved much. Rotates through 5 messages by turn."""
+        PRESSURE_MESSAGES = [
+            "just checking back — any flexibility on your price at all?",
+            "I have a trade offer from another seller that makes this less urgent — can you do better?",
+            "still interested but my other option is looking more attractive — any movement?",
+            "last check — is there any room at all or should I go with my other offer?",
+            "I need to make a decision today — can you sharpen your price?",
+        ]
+        index = (turn - 2) % len(PRESSURE_MESSAGES) if turn >= 2 else 0
+        fallback = PRESSURE_MESSAGES[index]
         prompt = (
             f"You are a buyer negotiating for a {item}. Current seller offer is ${current_offer:.0f}. "
-            f"Send a short follow-up asking for flexibility. Keep it under 20 words. Message:"
+            f"Send a short follow-up (turn {turn}) asking for flexibility. Vary the phrasing. Keep it under 25 words. Message:"
         )
         result = self.generate(prompt, max_tokens=40)
-        return self._clean(result, f"just checking back on the {item} — any flexibility on your price at all?")
+        return self._clean(result, fallback)
 
     def coalition_message(self, item: str, floor_minus_4: int) -> str:
         """Coalition pressure after detecting a bluff; counter at floor_minus_4."""
