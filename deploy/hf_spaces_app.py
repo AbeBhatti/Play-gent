@@ -15,13 +15,12 @@ if str(ROOT) not in sys.path:
 
 import gradio as gr
 
-from envs.diplomacy_env import DiplomacyNegotiationEnv
-from envs.contractor_env import ContractorNegotiationEnv
-from envs.human_imitation_env import HumanImitationEnv
+# Lazy-load envs so Gradio starts fast; heavy imports (sentence-transformers, data) happen on first use.
 
 
 # ---------- Diplomacy tab ----------
 def diplomacy_reset(state):
+    from envs.diplomacy_env import DiplomacyNegotiationEnv
     if state is None or state.get("env") is None:
         env = DiplomacyNegotiationEnv(seed=42)
         state = {"env": env, "state_text": "", "last_reward": None, "last_done": False, "last_info": None}
@@ -54,6 +53,7 @@ def diplomacy_step(state, action):
 
 # ---------- Contractor tab ----------
 def contractor_reset(state):
+    from envs.contractor_env import ContractorNegotiationEnv
     if state is None or state.get("env") is None:
         env = ContractorNegotiationEnv(seed=42)
         state = {"env": env, "state_text": "", "last_reward": None, "last_done": False, "last_info": None}
@@ -86,6 +86,7 @@ def contractor_step(state, action):
 
 # ---------- Human Imitation tab ----------
 def _human_imitation_env():
+    from envs.human_imitation_env import HumanImitationEnv
     data_path = ROOT / "training" / "data" / "selfplay_states.json"
     if not data_path.exists():
         data_path = ROOT / "training" / "data" / "selfplay_states_test.json"
