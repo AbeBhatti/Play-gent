@@ -4,6 +4,6 @@ torch --index-url https://download.pytorch.org/whl/cpu
 numpy
 tqdm
 rich
-openenv>=0.1.13
+openenv>=0.2.1
 gradio>=4.0
 Diplomacy
