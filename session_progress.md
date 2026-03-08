@@ -435,6 +435,34 @@ At the end of your session, append a block in this format:
 
 ---
 
+## Session — HF Hub fallback for bluff classifier — March 8, 2026
+
+**Status:** Complete
+
+### What Was Built
+- `agent/bluff_detector.py`: Updated `_get_bluff_classifier()` to:
+  - Prefer local `training/checkpoints/bluff_classifier_negotiation.pt` and then `training/checkpoints/bluff_classifier.pt` as before.
+  - If neither exists locally, fall back to downloading `bluff_classifier_negotiation.pt` from the HF Hub Space `Abeee32t/ArbitrAgent` using `hf_hub_download` and load the checkpoint from that path.
+  - When `training/checkpoints/bluff_classifier_tokenizer/` does not exist locally, fall back to `AutoTokenizer.from_pretrained("distilbert-base-uncased")` instead of failing.
+
+### What Was Tested
+- Static inspection of `_get_bluff_classifier()` to confirm the load order (negotiation → default → HF Hub) and that tokenizer loading now has a safe base-model fallback without changing any other detector behavior.
+
+### Decisions Made
+- Centralized the HF Hub fallback inside `_get_bluff_classifier()` so the rest of the agent and env code can remain unchanged while still benefiting from a remote negotiation-trained classifier when local checkpoints are missing.
+
+### Blockers / Known Issues
+- The HF Hub fallback assumes that `Abeee32t/ArbitrAgent` exposes `bluff_classifier_negotiation.pt` in the Space; if that file is missing or the environment lacks network/HF credentials, the detector will gracefully revert to pure rule-based scoring (existing behavior).
+
+### Files Modified
+- `agent/bluff_detector.py`
+- `session_progress.md`
+
+### Next Session Entry Point
+- (Optional) Validate the HF fallback path in a networked environment by removing local bluff classifier checkpoints and confirming that `_get_bluff_classifier()` successfully downloads and loads `bluff_classifier_negotiation.pt` from the Space.
+
+---
+
 ## Session — Negotiation bluff data + classifier wiring — March 8, 2026
 
 **Status:** Complete

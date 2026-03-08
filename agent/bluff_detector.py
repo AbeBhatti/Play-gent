@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
+from huggingface_hub import hf_hub_download
+
 # Lazy-loaded learned classifier (only on first use)
 _bluff_classifier_model = None
 _bluff_classifier_tokenizer = None
@@ -33,15 +35,26 @@ def _get_bluff_classifier():
     elif default_pt.exists():
         pt_path = default_pt
     else:
-        return None, None
+        # HF Hub fallback: try to download negotiation checkpoint from the Spaces repo.
+        try:
+            downloaded = hf_hub_download(
+                repo_id="Abeee32t/ArbitrAgent",
+                filename="bluff_classifier_negotiation.pt",
+                repo_type="space",
+            )
+            pt_path = Path(downloaded)
+        except Exception:
+            return None, None
 
     tok_dir = checkpoints_dir / "bluff_classifier_tokenizer"
-    if not tok_dir.exists():
-        return None, None
     try:
         import torch
         from transformers import AutoTokenizer, AutoModel
-        _bluff_classifier_tokenizer = AutoTokenizer.from_pretrained(str(tok_dir))
+        if tok_dir.exists():
+            _bluff_classifier_tokenizer = AutoTokenizer.from_pretrained(str(tok_dir))
+        else:
+            # Fallback: use base DistilBERT tokenizer when local tokenizer dir is missing.
+            _bluff_classifier_tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
 
         class _BluffClassifierModule(torch.nn.Module):
             def __init__(self):
