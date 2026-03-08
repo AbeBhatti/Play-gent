@@ -1,23 +1,99 @@
 """
 bluff_detector.py — bluff signal extraction for ArbitrAgent.
 
-This module exposes a small, deterministic API that inspects a seller's
-response in the context of a thread and extracts four bluff signals:
-
-1. timing_tell
-2. size_tell
-3. formulaic_tell
-4. pattern_tell
-
-The overall bluff_score is a weighted sum of these four signals. A response
-is flagged as a bluff when bluff_score > 0.6.
+Exposes four rule-based signals (timing, size, formulaic, pattern) and an optional
+learned DistilBERT classifier trained on IRC poker bluff labels. Combined score:
+  bluff_score = 0.6 * learned_bluff_score + 0.4 * rule_score
+is_bluff when bluff_score > 0.6.
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
+
+# Lazy-loaded learned classifier (only on first use)
+_bluff_classifier_model = None
+_bluff_classifier_tokenizer = None
+
+
+def _get_bluff_classifier():
+    """Lazy-load bluff_classifier.pt and tokenizer from training/checkpoints."""
+    global _bluff_classifier_model, _bluff_classifier_tokenizer
+    if _bluff_classifier_model is not None:
+        return _bluff_classifier_model, _bluff_classifier_tokenizer
+    pt_path = Path(__file__).resolve().parent.parent / "training" / "checkpoints" / "bluff_classifier.pt"
+    tok_dir = Path(__file__).resolve().parent.parent / "training" / "checkpoints" / "bluff_classifier_tokenizer"
+    if not pt_path.exists() or not tok_dir.exists():
+        return None, None
+    try:
+        import torch
+        from transformers import AutoTokenizer, AutoModel
+        _bluff_classifier_tokenizer = AutoTokenizer.from_pretrained(str(tok_dir))
+
+        class _BluffClassifierModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.encoder = AutoModel.from_pretrained("distilbert-base-uncased")
+                self.head = torch.nn.Linear(self.encoder.config.hidden_size, 2)
+
+            def forward(self, input_ids, attention_mask=None, **kwargs):
+                out = self.encoder(input_ids=input_ids, attention_mask=attention_mask)
+                return self.head(out.last_hidden_state[:, 0, :])
+
+        _bluff_classifier_model = _BluffClassifierModule()
+        _bluff_classifier_model.load_state_dict(torch.load(pt_path, map_location="cpu", weights_only=True))
+        _bluff_classifier_model.eval()
+        return _bluff_classifier_model, _bluff_classifier_tokenizer
+    except Exception:
+        return None, None
+
+
+def _thread_and_message_to_text(thread_history: Sequence[Mapping[str, Any]], seller_message: str) -> str:
+    """Convert thread + seller message into text matching poker training format (Position. Preflop. Flop. Turn. River. Pot)."""
+    parts: List[str] = []
+    for entry in thread_history:
+        if "agent" in entry:
+            parts.append(str(entry["agent"])[:80])
+        if "seller" in entry:
+            parts.append(str(entry["seller"])[:80])
+    # Map to poker-like: Preflop / Flop / Turn / River
+    preflop = parts[0] if len(parts) > 0 else "-"
+    flop = parts[1] if len(parts) > 1 else "-"
+    turn = parts[2] if len(parts) > 2 else "-"
+    river = seller_message[:200] if seller_message else "-"
+    return f"Position 1 of 2. Preflop: {preflop}. Flop: {flop}. Turn: {turn}. River: {river}. Pot: 0."
+
+
+def learned_bluff_score(message: str, thread_history: Sequence[Mapping[str, Any]]) -> float:
+    """
+    Run learned DistilBERT classifier on (message + thread). Returns P(bluff) in [0, 1].
+    Returns 0.0 if classifier not loaded.
+    """
+    model, tokenizer = _get_bluff_classifier()
+    if model is None or tokenizer is None:
+        return 0.0
+    text = _thread_and_message_to_text(thread_history, message)
+    try:
+        import torch
+        enc = tokenizer(
+            text,
+            truncation=True,
+            max_length=128,
+            padding="max_length",
+            return_tensors="pt",
+        )
+        with torch.no_grad():
+            logits = model(
+                input_ids=enc["input_ids"],
+                attention_mask=enc["attention_mask"],
+            )
+        probs = torch.softmax(logits, dim=1)
+        return float(probs[0, 1].item())  # class 1 = bluff
+    except Exception:
+        return 0.0
 
 
 FORMULAIC_PHRASES: List[str] = [
@@ -100,12 +176,17 @@ def analyze_bluff(
             for key in DEFAULT_WEIGHTS.keys()
         }
 
-    bluff_score = (
+    rule_score = (
         timing * norm_weights["timing_tell"]
         + size * norm_weights["size_tell"]
         + formulaic * norm_weights["formulaic_tell"]
         + pattern * norm_weights["pattern_tell"]
     )
+    learned = learned_bluff_score(seller_message, thread_history)
+    if _bluff_classifier_model is not None:
+        bluff_score = 0.6 * learned + 0.4 * rule_score
+    else:
+        bluff_score = rule_score
     is_bluff = bluff_score > 0.6
 
     return BluffSignals(

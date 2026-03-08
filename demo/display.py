@@ -1,9 +1,17 @@
+"""
+Rich terminal UI for the ArbitrAgent demo.
+
+Panel 1: NEGOTIATION THREADS — one row per seller (name, item, current offer, status).
+Panel 2: LIVE EVENT LOG — scrolling [BLUFF DETECTED], [GOOD OUTCOME], [HUMAN-ALIGNED MOVE], [ROUTE KILLED].
+Panel 3: ROUTE GRAPH — route_id, entry, exit, score, status.
+Panel 4: FINAL RESULT — Budget → Deployed → Final Value → Return, route and why.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from rich.columns import Columns
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -13,7 +21,7 @@ from rich.text import Text
 @dataclass
 class ThreadMessage:
     turn: int
-    sender: str  # "agent" or "seller"
+    sender: str
     text: str
     is_bluff: bool = False
 
@@ -23,20 +31,32 @@ class ThreadState:
     seller_id: str
     item: str
     archetype: str
-    status: str = "active"  # "active" | "dead" | "confirmed"
+    status: str = "active"  # "active" | "pending" | "confirmed" | "dead"
+    current_offer: Optional[float] = None
     messages: List[ThreadMessage] = field(default_factory=list)
     bluff_signals: Optional[Dict[str, float]] = None
 
 
+# Event types for the live event log
+BluffDetectedEvent = Dict[str, Any]  # seller_name, turn, timing_tell, size_tell, formulaic_tell, pattern_tell, action_taken
+GoodOutcomeEvent = Dict[str, Any]   # route_id, entry_cost, exit_value, return_multiple, did_not_accept_floor
+HumanAlignedEvent = Dict[str, Any]  # phase_name, action_taken, similarity_pct
+RouteKilledEvent = Dict[str, Any]   # seller_name, reason, capital_preserved
+
+
+def _status_style(status: str) -> str:
+    if status == "confirmed":
+        return "green"
+    if status == "active":
+        return "yellow"
+    if status == "dead":
+        return "red"
+    return "white"  # pending
+
+
 class NegotiationDisplay:
     """
-    Rich-based terminal display for the ArbitrAgent demo.
-
-    Responsibilities:
-    - Show all active negotiation threads as side-by-side panels.
-    - Highlight bluff detection in yellow with individual signals.
-    - Use red for dead routes / threads and green for confirmed routes.
-    - Render a final panel with budget → entry cost → exit value → return multiple.
+    Live terminal UI: negotiation threads, event log, route graph, final result.
     """
 
     def __init__(self, console: Optional[Console] = None) -> None:
@@ -47,172 +67,129 @@ class NegotiationDisplay:
         threads: List[ThreadState],
         route_summaries: List[Dict[str, Any]],
         budget: float,
+        event_log: Optional[List[Dict[str, Any]]] = None,
         final_metrics: Optional[Dict[str, Any]] = None,
         checkpoints: Optional[Dict[str, bool]] = None,
     ) -> None:
-        """Render the full demo view."""
         self.console.clear()
 
-        thread_panels = [self._build_thread_panel(t) for t in threads]
-        if thread_panels:
-            self.console.print(Columns(thread_panels, expand=True, equal=True))
-
-        # Routes + ROI panel at the bottom
-        summary_panel = self._build_summary_panel(
-            route_summaries=route_summaries,
-            budget=budget,
-            final_metrics=final_metrics,
-            checkpoints=checkpoints or {},
+        # Panel 1 — NEGOTIATION THREADS
+        threads_table = Table(
+            show_header=True,
+            header_style="bold",
+            title="NEGOTIATION THREADS",
+            title_style="bold",
         )
+        threads_table.add_column("Seller", no_wrap=True)
+        threads_table.add_column("Item", no_wrap=True)
+        threads_table.add_column("Current offer", justify="right", no_wrap=True)
+        threads_table.add_column("Status", no_wrap=True)
+        for t in threads:
+            offer_str = f"${t.current_offer:.2f}" if t.current_offer is not None else "—"
+            style = _status_style(t.status)
+            threads_table.add_row(
+                t.seller_id,
+                t.item,
+                offer_str,
+                f"[{style}]{t.status}[/{style}]",
+            )
+        self.console.print(Panel(threads_table, border_style="cyan", padding=(0, 1)))
         self.console.print()
-        self.console.print(summary_panel)
 
-    # ------------------------------------------------------------------ #
-    # Panel builders
-    # ------------------------------------------------------------------ #
+        # Panel 2 — LIVE EVENT LOG (scrolling, last N events)
+        events = event_log or []
+        log_lines: List[Any] = []
+        for ev in events[-30:]:
+            kind = ev.get("type") or ev.get("event")
+            if kind == "bluff_detected":
+                log_lines.append(Text("[BLUFF DETECTED]", style="bold yellow"))
+                log_lines.append(Text(f"  {ev.get('seller_name', ev.get('seller_id', ''))}, turn {ev.get('turn', '')}"))
+                log_lines.append(Text(f"  ✦ timing tell: {ev.get('timing_tell', 0):.2f}"))
+                log_lines.append(Text(f"  ✦ size tell: {ev.get('size_tell', 0):.2f}"))
+                log_lines.append(Text(f"  ✦ formulaic tell: {ev.get('formulaic_tell', 0):.2f}"))
+                log_lines.append(Text(f"  ✦ pattern tell: {ev.get('pattern_tell', 0):.2f}"))
+                log_lines.append(Text(f"  → action taken: {ev.get('action_taken', '')[:80]}..."))
+                log_lines.append(Text(""))
+            elif kind == "good_outcome":
+                log_lines.append(Text("[GOOD OUTCOME]", style="bold green"))
+                log_lines.append(Text(f"  route {ev.get('route_id', '')}, entry ${ev.get('entry_cost', 0):.2f}, exit ${ev.get('exit_value', 0):.2f}, return {ev.get('return_multiple', 0):.2f}x"))
+                log_lines.append(Text("  ✦ did not accept stated floor"))
+                log_lines.append(Text(""))
+            elif kind == "human_aligned":
+                log_lines.append(Text("[HUMAN-ALIGNED MOVE]", style="bold blue"))
+                log_lines.append(Text(f"  {ev.get('phase_name', '')}: {str(ev.get('action_taken', ''))[:60]}..."))
+                log_lines.append(Text(f"  ✦ matches human Diplomacy pattern: {ev.get('similarity_pct', 0):.0f}% similarity"))
+                log_lines.append(Text(""))
+            elif kind == "route_killed":
+                log_lines.append(Text("[ROUTE KILLED]", style="bold red"))
+                log_lines.append(Text(f"  {ev.get('seller_name', ev.get('seller_id', ''))}, {ev.get('reason', '')}"))
+                log_lines.append(Text("  ✦ capital preserved, pivoting"))
+                log_lines.append(Text(""))
+
+        if log_lines:
+            log_content = Text()
+            for line in log_lines:
+                log_content.append_text(line)
+                log_content.append("\n")
+            self.console.print(Panel(log_content, title="LIVE EVENT LOG", border_style="dim", padding=(0, 1), height=14))
+        else:
+            self.console.print(Panel("(no events yet)", title="LIVE EVENT LOG", border_style="dim", padding=(0, 1), height=6))
+        self.console.print()
+
+        # Panel 3 — ROUTE GRAPH
+        route_table = Table(
+            show_header=True,
+            header_style="bold",
+            title="ROUTE GRAPH",
+            title_style="bold",
+        )
+        route_table.add_column("route_id", no_wrap=True)
+        route_table.add_column("entry", justify="right", no_wrap=True)
+        route_table.add_column("exit", justify="right", no_wrap=True)
+        route_table.add_column("score", justify="right", no_wrap=True)
+        route_table.add_column("status", no_wrap=True)
+        for row in route_summaries:
+            st = row.get("status", "soft")
+            route_table.add_row(
+                row.get("edge_id", ""),
+                f"${row.get('entry_cost', 0):.2f}",
+                f"${row.get('exit_value', 0):.2f}",
+                f"{row.get('score', 0):.2f}",
+                f"[{_status_style(st)}]{st}[/{_status_style(st)}]",
+            )
+        self.console.print(Panel(route_table, border_style="cyan", padding=(0, 1)))
+        self.console.print()
+
+        # Panel 4 — FINAL RESULT (when available)
+        if final_metrics is not None:
+            entry = final_metrics.get("entry_cost")
+            exit_val = final_metrics.get("exit_value")
+            ret = final_metrics.get("return_multiple")
+            route_id = final_metrics.get("route_id", "")
+            why = final_metrics.get("why", "best scored confirmed route")
+            line1 = f"Budget: ${budget:.1f}  →  Deployed: ${entry:.2f}  →  Final Value: ${exit_val:.2f}  →  Return: {ret:.2f}x"
+            line2 = f"Route: {route_id} — {why}"
+            self.console.print(Panel(f"[bold]{line1}[/bold]\n\n{line2}", title="FINAL RESULT", border_style="green", padding=(1, 2)))
+        elif checkpoints and checkpoints.get("execution_complete"):
+            self.console.print(Panel("No route executed. Capital preserved.", title="FINAL RESULT", border_style="yellow", padding=(1, 2)))
+
+    # Legacy API: build thread panel per thread (for side-by-side thread view if needed)
     def _build_thread_panel(self, thread: ThreadState) -> Panel:
-        # Border colors by status
-        border_style = "bright_white"
-        if thread.status == "dead":
-            border_style = "red"
-        elif thread.status == "confirmed":
-            border_style = "green"
-
-        title = f"{thread.seller_id} • {thread.item} • {thread.archetype}"
-
+        border_style = _status_style(thread.status)
+        title = f"{thread.seller_id} • {thread.item}"
         table = Table.grid(padding=(0, 1))
-        table.expand = True
         table.add_column("Speaker", style="bold", no_wrap=True)
         table.add_column("Text", overflow="fold")
-
-        # Only show the last few turns to keep panels readable.
-        for msg in thread.messages[-8:]:
+        for msg in thread.messages[-6:]:
             speaker = "you" if msg.sender == "agent" else "seller"
             style = "cyan" if msg.sender == "agent" else "white"
             text = Text(msg.text, style=style)
             if msg.is_bluff:
-                # Yellow highlight for bluff detection.
                 text.stylize("black on yellow")
             table.add_row(speaker, text)
-
-        # Bluff signal breakdown, if present.
         if thread.bluff_signals:
-            sig = thread.bluff_signals
-            sig_table = Table.grid(padding=(0, 1))
-            sig_table.add_column(justify="left", no_wrap=True)
-            sig_table.add_column(justify="right", no_wrap=True)
-            sig_table.add_row(
-                "[bold yellow]Bluff detected[/bold yellow]",
-                f"[yellow]score={sig.get('bluff_score', 0.0):.2f}[/yellow]",
-            )
-            for key in ("timing_tell", "size_tell", "formulaic_tell", "pattern_tell"):
-                if key in sig:
-                    label = key.replace("_", " ")
-                    sig_table.add_row(label, f"{sig[key]:.2f}")
-
-            table.add_row("", sig_table)
-
-        return Panel(
-            table,
-            title=title,
-            border_style=border_style,
-            padding=(1, 1),
-        )
-
-    def _build_summary_panel(
-        self,
-        route_summaries: List[Dict[str, Any]],
-        budget: float,
-        final_metrics: Optional[Dict[str, Any]],
-        checkpoints: Dict[str, bool],
-    ) -> Panel:
-        table = Table.grid(padding=(0, 2))
-        table.expand = True
-
-        # Left: route statuses
-        routes_sub = Table(
-            show_header=True,
-            header_style="bold",
-            title="Route Graph",
-            title_style="bold",
-        )
-        routes_sub.add_column("Route", no_wrap=True)
-        routes_sub.add_column("Status", no_wrap=True)
-        routes_sub.add_column("Δ", justify="right", no_wrap=True)
-        routes_sub.add_column("Score", justify="right", no_wrap=True)
-
-        for row in route_summaries:
-            margin = row["exit_value"] - row["entry_cost"]
-            status = row["status"]
-            status_style = {
-                "dead": "red",
-                "confirmed": "green",
-                "soft": "yellow",
-            }.get(status, "white")
-            routes_sub.add_row(
-                row["edge_id"],
-                f"[{status_style}]{status}[/{status_style}]",
-                f"{margin:.2f}",
-                f"{row['score']:.2f}",
-            )
-
-        # Right: ROI + checkpoints
-        roi_sub = Table(
-            show_header=False,
-            box=None,
-            title="Capital Deployment",
-            title_style="bold",
-        )
-        roi_sub.add_column("Label", no_wrap=True)
-        roi_sub.add_column("Value", no_wrap=True)
-
-        entry_cost = None
-        exit_value = None
-        return_multiple = None
-
-        if final_metrics is not None:
-            entry_cost = final_metrics.get("entry_cost")
-            exit_value = final_metrics.get("exit_value")
-            return_multiple = final_metrics.get("return_multiple")
-
-        roi_sub.add_row("Budget", f"$ {budget:.2f}")
-        if entry_cost is not None:
-            roi_sub.add_row("Entry cost", f"$ {entry_cost:.2f}")
-        if exit_value is not None:
-            roi_sub.add_row("Exit value", f"$ {exit_value:.2f}")
-        if return_multiple is not None:
-            roi_sub.add_row("Return multiple", f"{return_multiple:.2f}x")
-
-        # Checkpoints list
-        checkpoints_sub = Table(
-            show_header=False,
-            box=None,
-            title="Demo Checkpoints",
-            title_style="bold",
-        )
-        checkpoints_sub.add_column("State", no_wrap=True)
-
-        labels = [
-            ("multi_thread_view", "Threads visible"),
-            ("bluff_detected", "Bluff flagged"),
-            ("dead_route_seen", "Dead route surfaced"),
-            ("route_confirmed", "Route confirmed"),
-            ("execution_complete", "Executed & logged"),
-        ]
-        for key, label in labels:
-            done = checkpoints.get(key, False)
-            style = "green" if done else "dim"
-            marker = "●" if done else "○"
-            checkpoints_sub.add_row(f"[{style}]{marker} {label}[/{style}]")
-
-        table.add_row(routes_sub, roi_sub, checkpoints_sub)
-        return Panel(
-            table,
-            title="ArbitrAgent — $20 → Multi-Route Arbitrage",
-            border_style="cyan",
-            padding=(1, 1),
-        )
+            table.add_row("", f"[yellow]bluff_score={thread.bluff_signals.get('bluff_score', 0):.2f}[/yellow]")
+        return Panel(table, title=title, border_style=border_style, padding=(0, 1))
 
 
 __all__ = ["NegotiationDisplay", "ThreadState", "ThreadMessage"]
-

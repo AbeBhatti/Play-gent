@@ -13,3 +13,7 @@ selfplay_states_test.json
 proj_context.md
 session_progress.md
 HF_TOKEN
+*.safetensors
+*.bin
+*.safetensors
+*.bin

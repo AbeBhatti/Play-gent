@@ -332,18 +332,22 @@ class ArbitrAgent:
                         self.route_graph.mark_dead(edge.edge_id)
                     continue
 
-                # Bluff detection: inspect full thread via bluff_detector.
+                # Bluff detection: inspect full thread via BluffDetector.
                 signals = analyze_from_sim(c.sim, resp or "")
 
-                # Log full bluff reasoning trace to structured log.
+                # Unverified floor claim: formulaic language present but not flagged as full bluff.
+                formulaic_present = signals.formulaic_tell > 0
+
+                # Log full bluff reasoning: turn, seller_id, bluff_score, signals dict, action_taken.
+                action_taken = msg  # the agent message we just sent before this response
                 self._structured_log.append(
                     {
                         "event": "bluff_analysis",
                         "phase": 3,
+                        "turn": c.sim.turn,
                         "seller_id": c.seller_id,
                         "item": c.item,
-                        "turn": c.sim.turn,
-                        "seller_message": resp,
+                        "bluff_score": signals.bluff_score,
                         "signals": {
                             "timing_tell": signals.timing_tell,
                             "size_tell": signals.size_tell,
@@ -352,9 +356,21 @@ class ArbitrAgent:
                             "bluff_score": signals.bluff_score,
                             "is_bluff": signals.is_bluff,
                         },
-                        "thread_history": list(getattr(c.sim, "thread_history", [])),
+                        "action_taken": action_taken,
+                        "seller_message": resp,
                     }
                 )
+
+                if not signals.is_bluff and formulaic_present:
+                    self._structured_log.append(
+                        {
+                            "event": "unverified_floor_claim",
+                            "phase": 3,
+                            "turn": c.sim.turn,
+                            "seller_id": c.seller_id,
+                            "seller_message": resp,
+                        }
+                    )
 
                 if verbose:
                     print(
@@ -367,11 +383,10 @@ class ArbitrAgent:
                         f"is_bluff={signals.is_bluff}"
                     )
 
-                # When a bluff is detected, immediately deploy coalition pressure.
+                # When a bluff is detected, deploy coalition pressure: floor - 4.
                 if signals.is_bluff:
                     current_offer = float(c.sim.current_offer)
-                    # Simple heuristic counter: push meaningfully below stated offer.
-                    offer = max(1, int(current_offer - 8))
+                    offer = max(1, int(current_offer - 4))
                     pressure_msg = (
                         "I have a trade offer from another seller that makes this less urgent for me — "
                         f"can you do ${offer}?"
@@ -397,12 +412,16 @@ class ArbitrAgent:
                         }
                     )
 
-                    # Update entry cost after pressure-induced move.
                     for edge in edges:
                         self.route_graph.update_entry_cost(edge.edge_id, c.sim.current_offer)
+                    # Bluff means seller has room — update confirmation probability upward.
+                    for edge in edges:
+                        self.route_graph.update_confirmation_probability(
+                            edge.edge_id,
+                            confirmation_probability=min(1.0, edge.confirmation_probability + 0.15),
+                        )
 
                 for edge in edges:
-                    # If we have a confirmed downstream target by this turn, upgrade probability.
                     target_index = int(edge.trade_target_id.split("_")[1])
                     if (edge.buy_item, target_index) in confirmed_targets:
                         self.route_graph.update_confirmation_probability(
@@ -410,8 +429,6 @@ class ArbitrAgent:
                         )
                         self.route_graph.mark_confirmed(edge.edge_id)
 
-                    # Adjust seller reliability slightly based on bluff score.
-                    # Higher bluff score → more room to push → treat as slightly *higher* edge value.
                     new_reliability = min(
                         1.0, edge.seller_reliability + 0.1 * float(signals.bluff_score)
                     )
