@@ -1,20 +1,27 @@
-venv/
-.venv/
-__pycache__/
-*.pyc
-*.pth
-wandb/
-grpo_output/
+# Model weights
+*.safetensors
+*.bin
 *.pt
+*.pth
+
+# Training data
+training/data/
 selfplay_states.json
 selfplay_states_test.json
-*.png
-.env
-proj_context.md
-session_progress.md
-HF_TOKEN
-*.safetensors
-*.bin
-*.safetensors
-*.bin
+
+# Poker data
 training/data/poker/
+
+# Training logs and outputs
+training/unified_training.log
+training/bluff_training.log
+grpo_output/
+
+# Checkpoints
+training/checkpoints/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
