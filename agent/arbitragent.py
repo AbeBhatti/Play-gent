@@ -302,7 +302,7 @@ class ArbitrAgent:
                     continue
 
                 current_offer = float(c.sim.current_offer)
-                msg = self.llm.pressure_message(c.item, current_offer)
+                msg = self.llm.pressure_message(c.item, current_offer, turn=turn)
 
                 resp = c.sim.step(msg)
                 if verbose:

@@ -27,3 +27,22 @@ def get_scenario():
     trade_targets = TRADE_TARGETS
     return sellers, trade_targets
 
+
+def get_extended_scenario():
+    """
+    Extended demo scenario:
+    - 5 sellers including the two additional profiles:
+      * seller_aggressive_001 (bluffer, vintage watch)
+      * seller_trader_001 (trade-curious, mountain bike)
+    - Uses the same trade targets; the demo loop controls turn count.
+    """
+    sellers = [
+        CraigslistSellerSim(get_profile("seller_motivated_001")),
+        CraigslistSellerSim(get_profile("seller_bluffer_camera")),
+        CraigslistSellerSim(get_profile("seller_ghoster_001")),
+        CraigslistSellerSim(get_profile("seller_aggressive_001")),
+        CraigslistSellerSim(get_profile("seller_trader_001")),
+    ]
+    trade_targets = TRADE_TARGETS
+    return sellers, trade_targets
+

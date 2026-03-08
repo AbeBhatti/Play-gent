@@ -50,7 +50,7 @@
       "turn": 2,
       "type": "negotiation_turn",
       "seller_id": "seller_motivated_001",
-      "agent_message": "just checking back on the road bike \u2014 any flexibility on your price at all?",
+      "agent_message": "still interested but my other option is looking more attractive \u2014 any movement?",
       "seller_response": "meet me at 111"
     },
     {
@@ -64,7 +64,7 @@
         "size_tell": 1.0,
         "formulaic_tell": 1.0,
         "pattern_tell": 0.0,
-        "bluff_score": 0.8805482625961304,
+        "bluff_score": 0.896950650215149,
         "is_bluff": true
       }
     },
@@ -73,7 +73,7 @@
       "turn": 2,
       "type": "negotiation_turn",
       "seller_id": "seller_bluffer_camera",
-      "agent_message": "just checking back on the vintage film camera \u2014 any flexibility on your price at all?",
+      "agent_message": "still interested but my other option is looking more attractive \u2014 any movement?",
       "seller_response": "been getting interest at 40, cant go lower"
     },
     {
@@ -81,7 +81,7 @@
       "turn": 2,
       "type": "negotiation_turn",
       "seller_id": "seller_ghoster_001",
-      "agent_message": "just checking back on the leather jacket \u2014 any flexibility on your price at all?",
+      "agent_message": "still interested but my other option is looking more attractive \u2014 any movement?",
       "seller_response": null
     },
     {
@@ -90,7 +90,7 @@
       "type": "negotiation_turn",
       "seller_id": "seller_motivated_001",
       "agent_message": "i have another buyer interested in the road bike, but i'd prefer to buy from you if we can make the numbers work. could you do a bit better on price?",
-      "seller_response": null
+      "seller_response": "i could do 109"
     },
     {
       "phase": 3,
@@ -103,7 +103,7 @@
         "size_tell": 1.0,
         "formulaic_tell": 1.0,
         "pattern_tell": 1.0,
-        "bluff_score": 0.9656329703330995,
+        "bluff_score": 0.9681276035308839,
         "is_bluff": true
       }
     },
@@ -112,7 +112,7 @@
       "turn": 3,
       "type": "negotiation_turn",
       "seller_id": "seller_bluffer_camera",
-      "agent_message": "just checking back on the vintage film camera \u2014 any flexibility on your price at all?",
+      "agent_message": "last check \u2014 is there any room at all or should I go with my other offer?",
       "seller_response": "look i really cant go lower than $30, thats my final offer. been getting a lot of interest so"
     },
     {
@@ -120,7 +120,7 @@
       "turn": 3,
       "type": "negotiation_turn",
       "seller_id": "seller_ghoster_001",
-      "agent_message": "just checking back on the leather jacket \u2014 any flexibility on your price at all?",
+      "agent_message": "last check \u2014 is there any room at all or should I go with my other offer?",
       "seller_response": null
     },
     {
@@ -129,7 +129,7 @@
       "type": "negotiation_turn",
       "seller_id": "seller_motivated_001",
       "agent_message": "i have another buyer interested in the road bike, but i'd prefer to buy from you if we can make the numbers work. could you do a bit better on price?",
-      "seller_response": null
+      "seller_response": "i could do 103"
     },
     {
       "phase": 3,
@@ -142,7 +142,7 @@
         "size_tell": 1.0,
         "formulaic_tell": 1.0,
         "pattern_tell": 1.0,
-        "bluff_score": 0.9656329703330995,
+        "bluff_score": 0.9681276035308839,
         "is_bluff": true
       }
     },
@@ -160,7 +160,7 @@
       "type": "negotiation_turn",
       "seller_id": "seller_motivated_001",
       "agent_message": "i have another buyer interested in the road bike, but i'd prefer to buy from you if we can make the numbers work. could you do a bit better on price?",
-      "seller_response": "i could do 105"
+      "seller_response": "meet me at 96"
     },
     {
       "phase": 3,
@@ -173,7 +173,7 @@
         "size_tell": 1.0,
         "formulaic_tell": 1.0,
         "pattern_tell": 1.0,
-        "bluff_score": 0.9656329703330995,
+        "bluff_score": 0.9681276035308839,
         "is_bluff": true
       }
     },
@@ -192,12 +192,12 @@
       "buy_seller_id": "seller_motivated_001",
       "buy_item": "road bike",
       "trade_target_id": "buyer_2_road_bike",
-      "entry_cost": 105.0,
+      "entry_cost": 96.0,
       "exit_value": 180.0,
       "status": "confirmed",
       "confirmation_probability": 1.0,
       "seller_reliability": 0.9,
-      "score": 67.5
+      "score": 75.60000000000001
     },
     {
       "edge_id": "route_2",
@@ -229,13 +229,13 @@
       "edge_id": "route_1",
       "buy_seller_id": "seller_motivated_001",
       "trade_target_id": "buyer_2_road_bike",
-      "entry_cost": 105.0,
+      "entry_cost": 96.0,
       "exit_value": 180.0
     },
     "final_value": 180.0,
-    "profit": 75.0,
-    "return_multiple": 1.7142857142857142,
-    "duration_seconds": 8.120891094207764
+    "profit": 84.0,
+    "return_multiple": 1.875,
+    "duration_seconds": 13.943956851959229
   },
   "checkpoints": {
     "multi_thread_view": true,

@@ -407,6 +407,40 @@ At the end of your session, append a block in this format:
 
 ---
 
+## Session — Richer seller sims + extended demo scenario — March 8, 2026
+
+**Status:** Complete
+
+### What Was Built
+- `simulation/seller_profiles.py`: Added two new profiles for local demos — `seller_aggressive_001` (vintage watch, bluffer, very aggressive and urgency-heavy, fast responses) and `seller_trader_001` (mountain bike, trade_curious, strongly prefers trades), plus a `mountain bike` listing entry for use in extended scenarios.
+- `simulation/seller_sim.py`: Made seller responses more varied per archetype while keeping canonical bluff injection intact:
+  - Motivated: now samples from `"i could do $X"`, `"how about $X?"`, `"meet me at $X"` when countering, while retaining the exact floor-reaching line.
+  - Bluffer: non-bluff turns use templates like `"firm on $X"`, `"cant do it for less than $X"`, `"thats my bottom line at $X"`, `"been getting interest at $X, cant go lower"`.
+  - Trade_curious: mixes cash-resistance and trade-inviting lines (`"not really looking for cash, got anything to trade?"`, `"id consider a trade for the right thing."`).
+- `simulation/scenario.py`: Added `get_extended_scenario()` that returns 5 sellers (standard three plus `seller_aggressive_001` and `seller_trader_001`) using the same `TRADE_TARGETS` as the standard demo.
+- `demo/run_demo.py`: Wired in a `--scenario` flag with choices `standard_demo` (existing behavior) and `extended_demo`; the extended scenario uses `get_extended_scenario()` and forces Phase 3 to run at least 7 negotiation turns while leaving `standard_demo` logic unchanged.
+
+### What Was Tested
+- Local reasoning pass over `demo/run_demo.py` and `simulation/scenario.py` to ensure `standard_demo` still uses the original three-seller scenario and Phase 3 turn count, while `extended_demo` exercises the new sellers and longer run without changing HF Spaces behavior.
+
+### Decisions Made
+- Kept all canonical demo behavior (especially `seller_bluffer_camera`’s bluff message and timing) intact so existing tests and HF Spaces flows remain valid, and scoped the richer behavior and extra sellers to the extended scenario for local exploration.
+
+### Blockers / Known Issues
+- The extended demo has not been wired into HF Spaces; it is intended as a local CLI-only scenario via `demo/run_demo.py --scenario extended_demo`.
+
+### Files Modified
+- `simulation/seller_profiles.py`
+- `simulation/seller_sim.py`
+- `simulation/scenario.py`
+- `demo/run_demo.py`
+- `session_progress.md`
+
+### Next Session Entry Point
+- Run `PYTHONPATH=. python demo/run_demo.py --budget 20 --sleep 0.5 --scenario extended_demo` locally to see the richer 5-seller, 7-turn negotiation story while keeping the standard HF Spaces demo unchanged.
+
+---
+
 ## Session — HF Spaces bluff_detected wiring fix — March 8, 2026
 
 **Status:** Complete
@@ -432,6 +466,40 @@ At the end of your session, append a block in this format:
 
 ### Next Session Entry Point
 - Run `PYTHONPATH=. python tests/test_reward_signals.py` and a quick HF Spaces manual check to confirm that `BLUFF DETECTED` only appears when the user's action either has a high learned bluff score or contains explicit bluff-calling language, without impacting the underlying reward curves.
+
+---
+
+## Session — Richer 4-phase terminal demo UI — March 8, 2026
+
+**Status:** Complete
+
+### What Was Built
+- **demo/display.py:** Redesigned with sequential 4-phase Rich UI:
+  - **Phase 1 (Scouting):** Header + per-seller contact lines: agent message, seller response (or [NO RESPONSE]), score, margin %, responsiveness (HIGH/MEDIUM/LOW).
+  - **Phase 2 (Route mapping):** Header + route lines with entry, exit, margin, score, status, and short reasoning.
+  - **Phase 3 (Pressure & negotiation):** Header + per-seller thread with turn-by-turn agent/seller messages; optional bluff analysis panel (timing/size/formulaic/pattern/learned_score, bluff_score, reasoning, bluff_reward); coalition pressure message and response; status changes (CONFIRMED ✓); route killed with consecutive_silence.
+  - **Phase 4 (Route scoring & execution):** Header + route table with margin × responsiveness × confirmation formula and which route is “EXECUTING THIS ROUTE”.
+  - **Final result:** Budget, Deployed, Final Value, Return, and key decisions (bullet list).
+- **demo/run_demo.py:** Collects all conversation and route data; drives the new UI phase-by-phase. Phase 1: builds `phase1_contacts` (score, margin_pct, responsiveness, ghosted). Phase 2: builds `phase2_routes` with reasoning. Phase 3: builds `phase3_seller_data` (per-seller turns with agent_msg, seller_msg, bluff_analysis including `learned_bluff_score`, coalition messages, status_change, consecutive_silence, route_killed). Phase 4: builds `phase4_routes` and passes `best_route_id`. Final: builds `key_decisions` from checkpoints. Uses `time.sleep(sleep_per_tick)` between turns and after each phase. `sample_run_log.json` output and `--scenario` / `--budget` / `--sleep` / `--log-path` unchanged; no changes to agent/, envs/, or training/.
+
+### What Was Tested
+- Lint pass on demo/display.py and demo/run_demo.py.
+
+### Decisions Made
+- Kept `NegotiationDisplay` and legacy `render()` for backward compatibility (e.g. HF Spaces or tests); new flow uses `PhaseDisplay` (phase1_header/contacts, phase2_header/routes, phase3_header/seller_thread, phase4_header/routes, final_header/result).
+- Bluff analysis shows `learned_score` by calling `learned_bluff_score(resp, thread_history)` in run_demo when bluff is detected; reasoning and bluff_reward are display-only.
+- Key decisions are derived from checkpoints (bluff_detected, dead_route_seen, route_confirmed) plus fixed copy for “Applied coalition pressure” and “Executed highest-scored confirmed route”.
+
+### Blockers / Known Issues
+- None.
+
+### Files Modified
+- demo/display.py
+- demo/run_demo.py
+- session_progress.md
+
+### Next Session Entry Point
+- Run `PYTHONPATH=. python demo/run_demo.py --budget 20 --sleep 0.5` to see the full 4-phase terminal UI; use `--scenario extended_demo` for 5 sellers and 7 turns.
 
 ---
 

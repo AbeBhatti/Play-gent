@@ -149,11 +149,8 @@ class PhaseDisplay:
         item: str,
         status: str,
         turns: List[Dict[str, Any]],
-        bluff_already_detected_sellers: Optional[Dict[str, float]] = None,
     ) -> None:
         st = _status_style(status)
-        if bluff_already_detected_sellers is None:
-            bluff_already_detected_sellers = {}
         self.console.print(f"  [bold]── {seller_id} ({item}) ──[/bold]")
         for t in turns:
             turn_num = t.get("turn", 0)
@@ -288,9 +285,8 @@ class PhaseDisplay:
         return_multiple: float,
         key_decisions: List[str],
     ) -> None:
-        leverage = deployed / budget if budget > 0 else 0
         self.console.print(f"  Budget:      ${budget:.2f}")
-        self.console.print(f"  Deployed:    ${deployed:.2f}  ({leverage:.2f}x leverage via confirmed route)")
+        self.console.print(f"  Deployed:    ${deployed:.2f}")
         self.console.print(f"  Final Value: ${final_value:.2f}")
         self.console.print(f"  Return:      {return_multiple:.2f}x")
         self.console.print()

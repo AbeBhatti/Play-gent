@@ -128,7 +128,7 @@ class AgentLLM:
             "last check — is there any room at all or should I go with my other offer?",
             "I need to make a decision today — can you sharpen your price?",
         ]
-        index = (turn - 2) % len(PRESSURE_MESSAGES) if turn >= 2 else 0
+        index = turn % len(PRESSURE_MESSAGES)
         fallback = PRESSURE_MESSAGES[index]
         prompt = (
             f"You are a buyer negotiating for a {item}. Current seller offer is ${current_offer:.0f}. "

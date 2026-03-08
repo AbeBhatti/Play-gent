@@ -22,6 +22,9 @@ LISTINGS = [
     {"item": "desk lamp", "category": "furniture", "resale_value": 45},
 ]
 
+# Additional listing used in extended demo scenarios.
+LISTINGS.append({"item": "mountain bike", "category": "sports", "resale_value": 220})
+
 SELLER_PROFILES = [
     # ── MOTIVATED SELLERS ──────────────────────────────────────
     {
@@ -89,11 +92,12 @@ SELLER_PROFILES = [
         "floor": 50,
         "archetype": "ghoster",
         "bluff_room": 0.0,
-        "response_prob": 0.35,
+        "response_prob": 0.0,
         "response_speed": "flaky",
         "trade_openness": 0.2,
         "personality": "Listed it and forgot. Responds randomly.",
         "tells": [],
+        "always_ghost": True,
     },
     {
         "id": "seller_ghoster_002",
@@ -136,6 +140,40 @@ SELLER_PROFILES = [
         "tells": [],
     },
 ]
+
+# Additional seller profiles for extended demo scenarios.
+SELLER_PROFILES.extend(
+    [
+        {
+            "id": "seller_aggressive_001",
+            "item": "vintage watch",
+            "listing_price": 85,
+            "floor": 55,
+            "archetype": "bluffer",
+            "bluff_room": 0.35,
+            "response_prob": 0.90,
+            "response_speed": "fast",
+            "trade_openness": 0.4,
+            "personality": "Very aggressive seller. Responds instantly, uses lots of urgency and fear-of-missing-out language.",
+            "tells": ["urgency", "formulaic language", "too-fast response"],
+            "bluff_message": "firm on $70, cant go lower. lots of people messaging me already",
+            "bluff_trigger_turn": 2,
+        },
+        {
+            "id": "seller_trader_001",
+            "item": "mountain bike",
+            "listing_price": 150,
+            "floor": 100,
+            "archetype": "trade_curious",
+            "bluff_room": 0.0,
+            "response_prob": 0.85,
+            "response_speed": "slow",
+            "trade_openness": 0.98,
+            "personality": "Loves gear swaps. Strong preference for trades over cash, especially for interesting bike parts.",
+            "tells": [],
+        },
+    ]
+)
 
 TRADE_TARGETS = [
     {"item": "vintage film camera", "buyer_price": 52, "confirmed_at_turn": 4},

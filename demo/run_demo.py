@@ -87,6 +87,7 @@ class DemoArbitrAgent(ArbitrAgent):
         # Per-seller Phase 3 display: seller_id -> { seller_id, item, status, turns: [] }
         phase3_seller_data: Dict[str, Dict[str, Any]] = {}
         consecutive_silence: Dict[str, int] = {}
+        bluff_detected_sellers: Dict[str, float] = {}  # seller_id -> score when first detected (for dedupe display)
 
         def get_thread(cand: SellerCandidate) -> ThreadState:
             if cand.seller_id not in threads:
@@ -241,7 +242,10 @@ class DemoArbitrAgent(ArbitrAgent):
                         "but i'd prefer to buy from you if we can make the numbers work. could you do a bit better on price?"
                     )
                 else:
-                    agent_msg = f"just checking back on the {cand.item} — any flexibility on your price at all?"
+                    current_offer = float(cand.sim.current_offer)
+                    agent_msg = self.llm.pressure_message(cand.item, current_offer, turn=turn)
+                    if not agent_msg.strip():
+                        agent_msg = f"just checking back on the {cand.item} — any flexibility on your price at all?"
 
                 resp = cand.sim.step(agent_msg)
                 thread.messages.append(ThreadMessage(turn=cand.sim.turn, sender="agent", text=agent_msg))
@@ -269,17 +273,23 @@ class DemoArbitrAgent(ArbitrAgent):
                             "pattern_tell": signals.pattern_tell,
                             "bluff_score": signals.bluff_score,
                         }
-                        turn_record["bluff_analysis"] = {
-                            "timing_tell": signals.timing_tell,
-                            "size_tell": signals.size_tell,
-                            "formulaic_tell": signals.formulaic_tell,
-                            "pattern_tell": signals.pattern_tell,
-                            "learned_score": learned,
-                            "bluff_score": signals.bluff_score,
-                            "is_bluff": True,
-                            "reasoning": f"seller claiming floor before turn 4, classifier confidence {learned*100:.0f}%, deploying coalition pressure",
-                            "bluff_reward": 0.9,
-                        }
+                        bluff_score_display = learned if learned is not None else signals.bluff_score
+                        if cand.seller_id not in bluff_detected_sellers:
+                            bluff_detected_sellers[cand.seller_id] = bluff_score_display
+                            turn_record["bluff_analysis"] = {
+                                "timing_tell": signals.timing_tell,
+                                "size_tell": signals.size_tell,
+                                "formulaic_tell": signals.formulaic_tell,
+                                "pattern_tell": bluff_score_display,
+                                "learned_score": learned,
+                                "bluff_score": signals.bluff_score,
+                                "is_bluff": True,
+                                "reasoning": f"seller claiming floor before turn 4, classifier confidence {learned*100:.0f}%, deploying coalition pressure",
+                                "bluff_reward": 0.9,
+                            }
+                        else:
+                            turn_record["bluff_already_detected"] = True
+                            turn_record["bluff_previous_score"] = bluff_detected_sellers[cand.seller_id]
                         event_log.append({
                             "type": "bluff_detected",
                             "seller_name": cand.seller_id,
