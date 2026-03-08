@@ -1,0 +1,10 @@
+# HuggingFace Spaces — ArbitrAgent OpenEnv 0.2.1 demo
+# Use this when the Space root is the deploy/ folder.
+# If the Space runs from repo root, install from repo root requirements and add: gradio, openenv, sentence-transformers, Diplomacy, torch, numpy.
+
+gradio>=4.0
+openenv>=0.1.13
+sentence-transformers
+Diplomacy
+torch
+numpy
