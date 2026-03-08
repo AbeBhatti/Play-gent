@@ -24,7 +24,10 @@ class ContractorNegotiationEnv(Env):
     def __init__(self, n_contractors=5, budget=10000, seed=None):
         self.n_contractors = n_contractors
         self.budget = budget
-        self.encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        try:
+            self.encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        except Exception:
+            self.encoder = None
         if seed:
             random.seed(seed)
             np.random.seed(seed)
@@ -145,6 +148,8 @@ class ContractorNegotiationEnv(Env):
 
     def _get_observation(self):
         text = self._get_state_text()
+        if self.encoder is None:
+            return np.zeros(384, dtype=np.float32)
         emb = self.encoder.encode(text, convert_to_numpy=True)
         return emb.astype(np.float32)
 

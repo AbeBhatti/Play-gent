@@ -45,7 +45,10 @@ class ArbitrAgentEnv(Env):
 
     def __init__(self, data_path: str = "training/data/selfplay_states.json", seed=None):
         self.data_path = data_path
-        self.encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        try:
+            self.encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        except Exception:
+            self.encoder = None
         if seed is not None:
             random.seed(seed)
             np.random.seed(seed)
@@ -104,6 +107,8 @@ class ArbitrAgentEnv(Env):
 
     def _accuracy_reward(self, action: str) -> float:
         """Cosine similarity between action embedding and human action embedding."""
+        if self.encoder is None:
+            return 0.0
         state_text = self.current_state.get("state_text", "")
         human_action_text = _extract_human_orders(state_text)
         action_emb = self.encoder.encode(action, convert_to_numpy=True)
@@ -204,6 +209,8 @@ Your task: Propose a move. If you detect a bluff, use coalition pressure; otherw
 
     def _get_observation(self):
         text = self._get_state_text()
+        if self.encoder is None:
+            return np.zeros(384, dtype=np.float32)
         emb = self.encoder.encode(text, convert_to_numpy=True)
         return emb.astype(np.float32)
 

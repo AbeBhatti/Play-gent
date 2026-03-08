@@ -19,7 +19,10 @@ class DiplomacyNegotiationEnv(Env):
     def __init__(self, power_name: str = "ENGLAND", seed: int | None = None):
         self._reset_random_power = power_name.upper() == "ENGLAND"  # default: vary power on reset for non-hardcoded obs
         self.power_name = power_name.upper()
-        self.encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        try:
+            self.encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        except Exception:
+            self.encoder = None
         self.game: Game | None = None
         self.current_phase: int = 0
         self.prev_sc_count: int = 0
@@ -149,6 +152,8 @@ class DiplomacyNegotiationEnv(Env):
     def _get_observation(self) -> np.ndarray:
         """Return a 384-dim MiniLM embedding of the current game state text."""
         text = self._get_state_text()
+        if self.encoder is None:
+            return np.zeros(384, dtype=np.float32)
         embedding = self.encoder.encode(text, convert_to_numpy=True)
         # Ensure consistent dtype for downstream RL code.
         return embedding.astype(np.float32)

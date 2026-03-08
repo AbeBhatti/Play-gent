@@ -17,7 +17,10 @@ from sentence_transformers import SentenceTransformer
 class HumanImitationEnv(Env):
     def __init__(self, data_path="training/data/selfplay_states.json", seed=None):
         self.data_path = data_path
-        self.encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        try:
+            self.encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        except Exception:
+            self.encoder = None
         if seed is not None:
             random.seed(seed)
             np.random.seed(seed)
@@ -115,6 +118,8 @@ Explain your reasoning and state your intended orders."""
 
     def _get_observation(self):
         text = self._get_state_text()
+        if self.encoder is None:
+            return np.zeros(384, dtype=np.float32)
         emb = self.encoder.encode(text, convert_to_numpy=True)
         return emb.astype(np.float32)
 
@@ -156,7 +161,10 @@ from sentence_transformers import SentenceTransformer
 class HumanImitationEnv(Env):
     def __init__(self, data_path="training/data/selfplay_states.json", seed=None):
         self.data_path = data_path
-        self.encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        try:
+            self.encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        except Exception:
+            self.encoder = None
         if seed is not None:
             random.seed(seed)
             np.random.seed(seed)
@@ -254,6 +262,8 @@ Explain your reasoning and state your intended orders."""
 
     def _get_observation(self):
         text = self._get_state_text()
+        if self.encoder is None:
+            return np.zeros(384, dtype=np.float32)
         emb = self.encoder.encode(text, convert_to_numpy=True)
         return emb.astype(np.float32)
 
