@@ -57,7 +57,33 @@ def unified_step(state, action):
         out = info.get("outcome", 0)
         blf = info.get("bluff", 0)
         total = info.get("total", reward)
-        breakdown = f"accuracy: {acc:.3f}  |  outcome: {out:.3f}  |  bluff: {blf:.3f}  |  total: {total:.3f}\nDone: {done}"
+
+        # Bluff signal breakdown
+        bluff_detected = info.get("bluff_detected", blf > 0.35)
+        bluff_signals = info.get("bluff_signals", {})
+        timing = bluff_signals.get("timing_tell", "—")
+        size = bluff_signals.get("size_tell", "—")
+        formulaic = bluff_signals.get("formulaic_tell", "—")
+        pattern = bluff_signals.get("pattern_tell", "—")
+        learned = bluff_signals.get("learned_score", "—")
+
+        bluff_line = "🚨 BLUFF DETECTED" if bluff_detected else "✓ No bluff detected"
+
+        breakdown = f"""reward breakdown:
+  accuracy : {acc:.3f}
+  outcome  : {out:.3f}
+  bluff    : {blf:.3f}
+  total    : {total:.3f}
+  done     : {done}
+
+bluff analysis:
+  {bluff_line}
+  timing_tell    : {timing}
+  size_tell      : {size}
+  formulaic_tell : {formulaic}
+  pattern_tell   : {pattern}
+  learned_score  : {learned}"""
+
         return state, state_text, breakdown, ""
     except Exception as e:
         return state, state.get("state_text", ""), f"Error: {e}", ""

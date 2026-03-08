@@ -285,3 +285,5 @@ GRPO is more sample-efficient for language model fine-tuning and produces more s
 ---
 
 *This file is the ground truth for the project. If anything in session_progress.md conflicts with this file, this file wins on architecture and thesis. session_progress.md wins on what has already been built.*
+
+**Handoff:** For a full breakdown of what has been built and what remains, give Claude both this file and `session_progress.md` (see the "Handoff for Claude" section at the end of session_progress.md).

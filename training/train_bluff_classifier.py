@@ -1,12 +1,16 @@
 """
-Train DistilBERT binary classifier on IRC poker bluff labels.
+Train DistilBERT binary classifier on bluff labels.
 
-Data: training/data/poker/bluff_labels.json
+Default data: training/data/poker/bluff_labels.json
 Model: distilbert-base-uncased + linear 768→2
 80/20 train/val stratified, 3 epochs, lr 2e-5, batch 32
 Saves: training/checkpoints/bluff_classifier.pt, bluff_classifier_tokenizer/
+
+Use --data to point at negotiation_bluff_labels.json and --output to choose
+an alternative checkpoint path.
 """
 
+import argparse
 import json
 import os
 from pathlib import Path
@@ -18,10 +22,10 @@ from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer, AutoModel
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-DATA_PATH = SCRIPT_DIR / "data" / "poker" / "bluff_labels.json"
-CHECKPOINT_DIR = SCRIPT_DIR / "checkpoints"
-MODEL_PT = CHECKPOINT_DIR / "bluff_classifier.pt"
-TOKENIZER_DIR = CHECKPOINT_DIR / "bluff_classifier_tokenizer"
+DEFAULT_DATA_PATH = SCRIPT_DIR / "data" / "poker" / "bluff_labels.json"
+DEFAULT_CHECKPOINT_DIR = SCRIPT_DIR / "checkpoints"
+DEFAULT_MODEL_PT = DEFAULT_CHECKPOINT_DIR / "bluff_classifier.pt"
+TOKENIZER_DIR = DEFAULT_CHECKPOINT_DIR / "bluff_classifier_tokenizer"
 MAX_LENGTH = 128
 EPOCHS = 3
 LR = 2e-5
@@ -68,10 +72,35 @@ class BluffDataset(Dataset):
 
 
 def main():
-    if not DATA_PATH.exists():
-        print(f"ERROR: {DATA_PATH} not found. Run training/parse_poker.py first.")
+    parser = argparse.ArgumentParser(description="Train bluff classifier.")
+    parser.add_argument(
+        "--data",
+        type=str,
+        default=str(DEFAULT_DATA_PATH),
+        help=(
+            "Path to JSON bluff label file "
+            '(default: training/data/poker/bluff_labels.json)'
+        ),
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default=str(DEFAULT_MODEL_PT),
+        help=(
+            "Path to save model checkpoint "
+            "(default: training/checkpoints/bluff_classifier.pt)"
+        ),
+    )
+    args = parser.parse_args()
+
+    data_path = Path(args.data)
+    model_pt = Path(args.output)
+    checkpoint_dir = model_pt.parent
+
+    if not data_path.exists():
+        print(f"ERROR: {data_path} not found.")
         return
-    with open(DATA_PATH) as f:
+    with data_path.open() as f:
         data = json.load(f)
     texts = [x["text"] for x in data]
     labels = [1 if x["is_bluff"] else 0 for x in data]
@@ -91,7 +120,7 @@ def main():
     opt = torch.optim.AdamW(model.parameters(), lr=LR)
     criterion = nn.CrossEntropyLoss()
 
-    os.makedirs(CHECKPOINT_DIR, exist_ok=True)
+    os.makedirs(checkpoint_dir, exist_ok=True)
 
     for epoch in range(EPOCHS):
         model.train()
@@ -133,9 +162,9 @@ def main():
 
     if acc < 0.65:
         print(f"WARNING: Val accuracy {acc:.4f} < 0.65 (target). Consider more data or epochs.")
-    torch.save(model.state_dict(), MODEL_PT)
+    torch.save(model.state_dict(), model_pt)
     tokenizer.save_pretrained(TOKENIZER_DIR)
-    print(f"Saved model to {MODEL_PT}, tokenizer to {TOKENIZER_DIR}")
+    print(f"Saved model to {model_pt}, tokenizer to {TOKENIZER_DIR}")
 
 
 if __name__ == "__main__":

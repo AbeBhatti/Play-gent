@@ -1,0 +1,74 @@
+[
+  {
+    "name": "Call the bluff with coalition pressure",
+    "action": "That's a bluff. I have two other sellers lined up. Can you do $24?",
+    "accuracy": 0.03860844671726227,
+    "outcome": 0.3,
+    "bluff": 0.8999999999999999,
+    "total": 0.38851295635104177,
+    "passed": true
+  },
+  {
+    "name": "Accept bluff at face value (bad move)",
+    "action": "Ok $30 sounds fair, I'll take it.",
+    "accuracy": 0.008552495899945254,
+    "outcome": -0.6,
+    "bluff": 0.0,
+    "total": -0.20700662643501916,
+    "passed": true
+  },
+  {
+    "name": "Good Diplomacy move",
+    "action": "F LYO - TYS, A TYR - VEN, A VEN - TRI",
+    "accuracy": 0.5476244418397214,
+    "outcome": 0.0,
+    "bluff": 0.0,
+    "total": 0.19166855464390248,
+    "passed": true
+  },
+  {
+    "name": "Irrelevant action",
+    "action": "I like pizza",
+    "accuracy": 0.0894646868109703,
+    "outcome": 0.0,
+    "bluff": 0.0,
+    "total": 0.03131264038383961,
+    "passed": true
+  },
+  {
+    "name": "Aggressive bluff call",
+    "action": "You're lying. I know you have no other buyers. $20 final, non-negotiable.",
+    "accuracy": -0.03571191855811089,
+    "outcome": 0.0,
+    "bluff": 0.8999999999999999,
+    "total": 0.25750082850466116,
+    "passed": true
+  },
+  {
+    "name": "Coalition pressure with trade offer",
+    "action": "I have a better deal lined up, this isn't urgent for me. $22 or I walk.",
+    "accuracy": 0.2031959593296051,
+    "outcome": 0.2,
+    "bluff": 0.8999999999999999,
+    "total": 0.41111858576536175,
+    "passed": true
+  },
+  {
+    "name": "Diplomatic negotiation",
+    "action": "Let's work together against Russia. I'll support your move if you support mine.",
+    "accuracy": 0.03484741225838661,
+    "outcome": 0.4,
+    "bluff": 0.0,
+    "total": 0.1521965942904353,
+    "passed": true
+  },
+  {
+    "name": "Neutral offer",
+    "action": "How about $28, I can pay cash today?",
+    "accuracy": 0.0035153052070918804,
+    "outcome": 0.0,
+    "bluff": 0.0,
+    "total": 0.001230356822482158,
+    "passed": true
+  }
+]

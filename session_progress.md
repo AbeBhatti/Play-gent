@@ -340,3 +340,100 @@ At the end of your session, append a block in this format:
 
 ### Next Session Entry Point
 - Push to GitHub and HF Spaces completed (or run: `git push origin main`, `git push https://...@huggingface.co/spaces/Abeee32t/ArbitrAgent main`).
+
+---
+
+## Session — Reward signals test + HF Spaces breakdown + env info — March 8, 2026
+
+**Status:** Complete
+
+### What Was Built
+- **tests/test_reward_signals.py:** Terminal test suite for ArbitrAgentEnv reward signals and bluff detector. Runs 8 test cases (coalition pressure, accept bluff, Diplomacy move, irrelevant, aggressive bluff call, trade offer, diplomatic negotiation, neutral offer). Checks accuracy/outcome/bluff/total and expects bluff_high vs outcome_positive per case. Saves results to tests/reward_signal_results.json. Run: `PYTHONPATH=. python tests/test_reward_signals.py`.
+- **envs/arbitragent_env.py:** step() info now includes `bluff_detected` (seller message is bluff) and `bluff_signals` (timing_tell, size_tell, formulaic_tell, pattern_tell, learned_score). Bluff reward now: analyze synthetic SELLER message for UI signals; reward agent for coalition pressure / bluff-calling language when in bluff context (keyword-based).
+- **deploy/hf_spaces_app.py:** unified_step() reward breakdown replaced with full block: accuracy, outcome, bluff, total, done, plus bluff analysis (BLUFF DETECTED / No bluff, timing_tell, size_tell, formulaic_tell, pattern_tell, learned_score).
+
+### What Was Tested
+- `PYTHONPATH=. python tests/test_reward_signals.py`: 6/8 cases pass. Two borderline failures: (1) "Call the bluff" — outcome 0.3 (coalition language) vs expected non-positive; (2) "Good Diplomacy move" — outcome 0.0 (no outcome keywords in orders) vs expected positive.
+
+### Files Modified
+- `tests/test_reward_signals.py` (new)
+- `envs/arbitragent_env.py`
+- `deploy/hf_spaces_app.py`
+
+### Next Session Entry Point
+- Tune test expectations or outcome/bluff keyword rules if 8/8 desired. Push to GitHub/HF Spaces as needed.
+
+---
+
+## Session — Demo uses trained TinyLlama via AgentLLM — March 8, 2026
+
+**Status:** Complete
+
+### What Was Built
+- **agent/agent_llm.py:** Class `AgentLLM` with lazy load of unified_final (fallback phase2_final). Method `generate(prompt, max_tokens=80)` uses AutoModelForCausalLM/AutoTokenizer, returns generated text only (prompt stripped). Three methods: `scout_message(item, listing_price)`, `pressure_message(item, current_offer)`, `coalition_message(item, floor_minus_4)` — each builds a negotiation prompt and calls `generate()`; fallback to hardcoded strings if model missing or output too short.
+- **agent/arbitragent.py:** Import `AgentLLM`; in `__init__` set `self.llm = AgentLLM()`. Replaced hardcoded strings: scout → `self.llm.scout_message(c.item, c.listing_price)`; Phase 3 pressure → `self.llm.pressure_message(c.item, current_offer)`; coalition (on bluff) → `self.llm.coalition_message(c.item, offer)` with `offer = max(1, int(current_offer - 4))`. Removed unused `has_confirmed_downstream` branch (single pressure message path).
+
+### What Was Tested
+- `PYTHONPATH=. python -c "from agent.agent_llm import AgentLLM; ..."` — AgentLLM loads unified_final and returns generated scout/pressure/coalition snippets; fallbacks work when checkpoint missing.
+
+### Files Modified
+- `agent/agent_llm.py` (new)
+- `agent/arbitragent.py`
+- `session_progress.md`
+
+### Next Session Entry Point
+- Run full demo `python demo/run_demo.py --budget 20 --sleep 0.5` to confirm end-to-end with LLM-generated messages (first run ~30s while model loads).
+
+---
+
+## Handoff for Claude — What we've done and what's left
+
+**Give both proj_context.md and session_progress.md to Claude for a full breakdown.**
+
+### Done (summary)
+- **Envs:** DiplomacyNegotiationEnv, ContractorNegotiationEnv, HumanImitationEnv, ArbitrAgentEnv — all OpenEnv 0.2.1 compliant; verified with test_all_envs.py.
+- **Training:** Phase 1 (GRPO Diplomacy), Phase 2 (HumanImitation), unified (ArbitrAgentEnv); bluff classifier (IRC poker); checkpoints: grpo_output/checkpoint-2, phase2_final, unified_final, bluff_classifier.pt.
+- **Agent:** arbitragent.py (5-phase loop, uses AgentLLM for messages), route_graph.py, bluff_detector.py (rule + learned), agent_llm.py (trained TinyLlama unified_final/phase2_final for scout/pressure/coalition).
+- **Simulation:** seller_profiles.py, seller_sim.py, scenario.py; deterministic bluff inject for demo.
+- **Demo:** run_demo.py (full loop, JSON log), display.py (Rich UI); all 5 checkpoints (multi_thread_view, bluff_detected, dead_route_seen, route_confirmed, execution_complete) and return_multiple > 1.0.
+- **Deploy:** hf_spaces_app.py (Gradio: ArbitrAgentEnv tab with full bluff breakdown, Live Demo tab).
+- **Tests:** test_all_envs.py (OpenEnv compliance), test_bluff_detector.py, tests/test_reward_signals.py (6/8 pass).
+
+### Left / optional
+- **HF Spaces push:** Use valid HF token; push with `git push https://USER:TOKEN@huggingface.co/spaces/Abeee32t/ArbitrAgent main`.
+- **Submission checklist:** Both envs on HF Spaces, Colab notebook, side-by-side trained vs base, 1-min video, README, cerebralvalley.ai submit by Sunday 1:00 PM.
+- **Reward signals test:** 8/8 pass (optional): adjust outcome/bluff semantics or test expectations for the two borderline cases.
+- **proj_context.md:** Do not modify; it is the architecture/thesis ground truth. session_progress.md is the build log and handoff source.
+
+---
+
+## Session — Negotiation bluff data + classifier wiring — March 8, 2026
+
+**Status:** Complete
+
+### What Was Built
+- `training/generate_negotiation_bluff_data.py`: Script to generate 500 bluff and 4500 non-bluff synthetic negotiation messages and save them as `training/data/negotiation_bluff_labels.json` with `[{"text": "...", "is_bluff": true/false}, ...]`.
+- `training/train_bluff_classifier.py`: Updated to accept a `--data` flag (default `training/data/poker/bluff_labels.json`) and an `--output` flag (default `training/checkpoints/bluff_classifier.pt`) so the same trainer can be reused for poker or negotiation bluff data.
+- `agent/bluff_detector.py`: Updated checkpoint loading to first try `training/checkpoints/bluff_classifier_negotiation.pt` and fall back to `training/checkpoints/bluff_classifier.pt`, keeping the tokenizer directory unchanged.
+
+### What Was Tested
+- Static verification of the new generator and CLI flags: confirmed paths and defaults line up with existing training/checkpoints layout and that the bluff detector now prefers the negotiation-specific checkpoint if present.
+
+### Decisions Made
+- Negotiation bluff data is fully synthetic, focused on seller floor/“final offer” language with varied dollar amounts in the $15–$200 range to better match the unified ArbitrAgentEnv negotiation surface.
+- The tokenizer directory remains `training/checkpoints/bluff_classifier_tokenizer` for both poker and negotiation variants to simplify loading from `agent/bluff_detector.py`.
+- Negotiation-specific weights are saved to `training/checkpoints/bluff_classifier_negotiation.pt` so poker and negotiation checkpoints can coexist and be swapped without code changes.
+
+### Blockers / Known Issues
+- The new negotiation-trained classifier has not yet been trained; until the `train_bluff_classifier.py` command is run with the negotiation dataset, the detector will continue to use the existing poker-trained checkpoint (or just the rule-based score if none are present).
+
+### Files Modified
+- `training/generate_negotiation_bluff_data.py` (new)
+- `training/train_bluff_classifier.py`
+- `agent/bluff_detector.py`
+- `session_progress.md`
+
+### Next Session Entry Point
+- Generate negotiation bluff data and train the negotiation-specific classifier:
+  - `PYTHONPATH=. python training/generate_negotiation_bluff_data.py`
+  - `PYTHONPATH=. python training/train_bluff_classifier.py --data training/data/negotiation_bluff_labels.json --output training/checkpoints/bluff_classifier_negotiation.pt`

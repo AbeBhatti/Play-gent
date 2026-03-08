@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from agent.route_graph import RouteGraph, RouteEdge
 from agent.bluff_detector import analyze_from_sim
+from agent.agent_llm import AgentLLM
 from simulation.scenario import get_scenario
 from simulation.seller_profiles import LISTINGS
 
@@ -53,6 +54,7 @@ class ArbitrAgent:
     def __init__(self, budget: float = 20.0, min_route_score: float = 1.0):
         self.budget = float(budget)
         self.route_graph = RouteGraph(minimum_threshold=min_route_score)
+        self.llm = AgentLLM()
         # Structured event log for downstream inspection / demo UIs.
         self._structured_log: List[Dict[str, Any]] = []
 
@@ -194,7 +196,7 @@ class ArbitrAgent:
 
     def _open_soft_inquiries(self, candidates: List[SellerCandidate], verbose: bool = True) -> None:
         for c in candidates:
-            msg = f"hey, is the {c.item} still available? any room on price?"
+            msg = self.llm.scout_message(c.item, c.listing_price)
             resp = c.sim.step(msg)
             if verbose:
                 print(f"[to {c.seller_id}] {msg}")
@@ -299,21 +301,8 @@ class ArbitrAgent:
                         self.route_graph.mark_dead(edge.edge_id)
                     continue
 
-                # Do we have any confirmed downstream target yet?
-                has_confirmed_downstream = any(
-                    (edge.buy_item, int(edge.trade_target_id.split("_")[1]))
-                    in confirmed_targets
-                    for edge in edges
-                )
-
-                if has_confirmed_downstream:
-                    msg = (
-                        f"i have another buyer interested in the {c.item}, "
-                        "but i'd prefer to buy from you if we can make the numbers work. "
-                        "could you do a bit better on price?"
-                    )
-                else:
-                    msg = f"just checking back on the {c.item} — any flexibility on your price at all?"
+                current_offer = float(c.sim.current_offer)
+                msg = self.llm.pressure_message(c.item, current_offer)
 
                 resp = c.sim.step(msg)
                 if verbose:
@@ -387,10 +376,7 @@ class ArbitrAgent:
                 if signals.is_bluff:
                     current_offer = float(c.sim.current_offer)
                     offer = max(1, int(current_offer - 4))
-                    pressure_msg = (
-                        "I have a trade offer from another seller that makes this less urgent for me — "
-                        f"can you do ${offer}?"
-                    )
+                    pressure_msg = self.llm.coalition_message(c.item, offer)
                     pressure_resp = c.sim.step(pressure_msg)
                     if verbose:
                         print(f"[to {c.seller_id}] {pressure_msg}")

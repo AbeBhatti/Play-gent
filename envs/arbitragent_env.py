@@ -77,7 +77,7 @@ class ArbitrAgentEnv(Env):
 
         accuracy = self._accuracy_reward(action)
         outcome = self._outcome_reward(action_lower)
-        bluff = self._bluff_reward(action_lower)
+        bluff, bluff_signals, seller_bluff_detected = self._bluff_reward(action_lower)
 
         total = 0.35 * accuracy + 0.35 * outcome + 0.30 * bluff
         self._last_reward_breakdown = {"accuracy": accuracy, "outcome": outcome, "bluff": bluff, "total": total}
@@ -97,6 +97,8 @@ class ArbitrAgentEnv(Env):
             "total": total,
             "phase": self.current_state.get("phase", ""),
             "power": self.current_state.get("power", ""),
+            "bluff_detected": seller_bluff_detected,
+            "bluff_signals": bluff_signals,
         }
         return obs, total, self.done, info
 
@@ -132,19 +134,40 @@ class ArbitrAgentEnv(Env):
             reward -= 0.3
         return float(np.clip(reward, -1.0, 1.0))
 
-    def _bluff_reward(self, action_lower: str) -> float:
-        """Use BluffDetector (learned + rules) on the action text; return bluff_score as reward component."""
+    def _bluff_reward(self, action_lower: str):
+        """
+        Analyze the synthetic SELLER message for bluff_detected and bluff_signals (for info).
+        Bluff reward = score agent for coalition pressure / bluff-calling when seller message is a bluff.
+        """
         try:
-            from agent.bluff_detector import analyze_bluff
+            from agent.bluff_detector import analyze_bluff, learned_bluff_score
+            # Analyze the seller's (synthetic) message for UI signals
             signals = analyze_bluff(
                 SYNTHETIC_BLUFF_PROFILE,
                 SYNTHETIC_THREAD,
-                action_lower,
+                SYNTHETIC_BLUFF_MESSAGE,
                 turn=2,
             )
-            return float(signals.bluff_score)
+            learned = learned_bluff_score(SYNTHETIC_BLUFF_MESSAGE, SYNTHETIC_THREAD)
+            signals_dict = {
+                "timing_tell": round(signals.timing_tell, 3),
+                "size_tell": round(signals.size_tell, 3),
+                "formulaic_tell": round(signals.formulaic_tell, 3),
+                "pattern_tell": round(signals.pattern_tell, 3),
+                "learned_score": round(learned, 3),
+            }
+            # Synthetic state always includes the canonical bluff message; reward agent for coalition pressure
+            seller_is_bluff = signals.is_bluff or (signals.bluff_score > 0.25)  # treat synthetic as bluff context
+            reward = 0.0
+            if seller_is_bluff:
+                if any(w in action_lower for w in ["bluff", "other seller", "other buyers", "other deal", "lined up", "two other", "better deal", "isn't urgent", "or i walk", "can you do $", "trade offer from another", "sellers lined up"]):
+                    reward += 0.6
+                if any(w in action_lower for w in ["lying", "final", "non-negotiable", "counter", "$20", "$22", "$24", "$26", "non negotiable"]):
+                    reward += 0.3
+            reward = float(np.clip(reward, 0.0, 1.0))
+            return reward, signals_dict, True  # synthetic seller message is always bluff for UI
         except Exception:
-            return 0.0
+            return 0.0, {}, False
 
     def _get_next_state(self):
         current_game_id = self.current_state.get("game_id")

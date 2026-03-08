@@ -24,9 +24,19 @@ def _get_bluff_classifier():
     global _bluff_classifier_model, _bluff_classifier_tokenizer
     if _bluff_classifier_model is not None:
         return _bluff_classifier_model, _bluff_classifier_tokenizer
-    pt_path = Path(__file__).resolve().parent.parent / "training" / "checkpoints" / "bluff_classifier.pt"
-    tok_dir = Path(__file__).resolve().parent.parent / "training" / "checkpoints" / "bluff_classifier_tokenizer"
-    if not pt_path.exists() or not tok_dir.exists():
+    checkpoints_dir = Path(__file__).resolve().parent.parent / "training" / "checkpoints"
+    negotiation_pt = checkpoints_dir / "bluff_classifier_negotiation.pt"
+    default_pt = checkpoints_dir / "bluff_classifier.pt"
+    # Prefer negotiation-trained classifier if present, else fall back to poker-trained one.
+    if negotiation_pt.exists():
+        pt_path = negotiation_pt
+    elif default_pt.exists():
+        pt_path = default_pt
+    else:
+        return None, None
+
+    tok_dir = checkpoints_dir / "bluff_classifier_tokenizer"
+    if not tok_dir.exists():
         return None, None
     try:
         import torch
