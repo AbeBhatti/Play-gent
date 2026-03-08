@@ -3,12 +3,11 @@ from typing import Any, Dict, Tuple
 
 import numpy as np
 from diplomacy import Game
+from openenv.env import Env
 from sentence_transformers import SentenceTransformer
 
-from openenv_base import OpenEnvBase
 
-
-class DiplomacyNegotiationEnv(OpenEnvBase):
+class DiplomacyNegotiationEnv(Env):
     """
     OpenEnv-compatible wrapper around the diplomacy.Game engine.
 

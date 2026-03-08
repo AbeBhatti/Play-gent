@@ -16,17 +16,11 @@ Swap guide:
 import random
 import numpy as np
 
-try:
-    from openenv_base import OpenEnvBase
-    BASE = OpenEnvBase
-except ImportError:
-    class BASE:
-        pass
-
+from openenv.env import Env
 from sentence_transformers import SentenceTransformer
 
 
-class ContractorNegotiationEnv(BASE):
+class ContractorNegotiationEnv(Env):
     def __init__(self, n_contractors=5, budget=10000, seed=None):
         self.n_contractors = n_contractors
         self.budget = budget
