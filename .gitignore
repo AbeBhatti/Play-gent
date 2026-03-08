@@ -9,5 +9,6 @@ selfplay_states.json
 selfplay_states_test.json
 *.png
 .env
-.md
+proj_context.md
+session_progress.md
 HF_TOKEN
