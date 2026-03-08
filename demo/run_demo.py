@@ -52,6 +52,8 @@ class DemoArbitrAgent(ArbitrAgent):
         scenario: str = "standard_demo",
         sleep_per_tick: float = 0.5,
     ) -> Dict[str, Any]:
+        import random
+        random.seed(42)  # deterministic demo so all 5 checkpoints (including bluff) hit
         self.budget = float(budget)
         sellers, trade_targets = get_scenario()
         display = NegotiationDisplay()

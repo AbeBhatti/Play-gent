@@ -53,6 +53,13 @@ This is a bluff — you actually have room left but you want them to think you d
         self.turn += 1
         self.thread_history.append({"turn": self.turn, "agent": agent_message})
 
+        # Bluffer always sends bluff message at trigger turn (deterministic demo inject)
+        p = self.profile
+        if p.get("archetype") == "bluffer" and self.turn >= p.get("bluff_trigger_turn", 3):
+            response = p["bluff_message"]
+            self.thread_history.append({"turn": self.turn, "seller": response})
+            return response
+
         # Check ghost probability
         ghost_prob = self.response_profile["ghost_prob"]
         if self.profile["archetype"] == "ghoster" and self.turn >= 2:

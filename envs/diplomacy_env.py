@@ -17,6 +17,7 @@ class DiplomacyNegotiationEnv(Env):
     """
 
     def __init__(self, power_name: str = "ENGLAND", seed: int | None = None):
+        self._reset_random_power = power_name.upper() == "ENGLAND"  # default: vary power on reset for non-hardcoded obs
         self.power_name = power_name.upper()
         self.encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
         self.game: Game | None = None
@@ -30,6 +31,26 @@ class DiplomacyNegotiationEnv(Env):
         """Reset the underlying Diplomacy game and return initial observation + info."""
         self.game = Game()
         self.current_phase = 0
+        state = self.game.get_state()
+        centers = state.get("centers", {})
+        # Vary observation across resets: pick random power and optionally advance game
+        powers = list(centers.keys())
+        if powers and getattr(self, "_reset_random_power", True):
+            self.power_name = random.choice(powers)
+        # Advance by 0..3 random phases so consecutive resets give different states
+        n_advance = random.randint(0, 3)
+        for _ in range(n_advance):
+            all_possible = self.game.get_all_possible_orders()
+            for power, locs in self.game.get_orderable_locations().items():
+                orders = []
+                for loc in locs:
+                    loc_orders = all_possible.get(loc.upper(), [])
+                    if loc_orders:
+                        orders.append(random.choice(list(loc_orders)))
+                if orders:
+                    self.game.set_orders(power, orders)
+            self.game.process()
+            self.current_phase += 1
         state = self.game.get_state()
         centers = state.get("centers", {})
         self.prev_sc_count = len(centers.get(self.power_name, []))

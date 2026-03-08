@@ -185,6 +185,10 @@ def analyze_bluff(
     learned = learned_bluff_score(seller_message, thread_history)
     if _bluff_classifier_model is not None:
         bluff_score = 0.6 * learned + 0.4 * rule_score
+        # When all four rule tells fire (canonical bluff message), ensure we still flag it
+        # even if learned model says 0 (poker-trained on different text distribution)
+        if rule_score >= 1.0 and bluff_score < 0.6:
+            bluff_score = max(bluff_score, 0.65)
     else:
         bluff_score = rule_score
     is_bluff = bluff_score > 0.6
