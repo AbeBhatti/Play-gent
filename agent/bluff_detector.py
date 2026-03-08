@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
@@ -37,7 +38,10 @@ def _get_bluff_classifier():
     elif default_pt.exists():
         pt_path = default_pt
     else:
-        # HF Hub fallback: try to download negotiation checkpoint from the Spaces repo.
+        # HF Hub fallback: only when not running on HF Spaces and no local checkpoints.
+        if os.environ.get("HF_SPACES") == "1":
+            return None, None
+        # Try to download negotiation checkpoint from the HF Hub repo.
         try:
             downloaded = hf_hub_download(
                 repo_id="Abeee32t/arbitragent-bluff-classifier",
