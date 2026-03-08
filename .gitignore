@@ -4,12 +4,8 @@
 *.pt
 *.pth
 
-# Training data
-training/data/
+# Training data (large files — exclude everything except test stub)
 selfplay_states.json
-selfplay_states_test.json
-
-# Poker data
 training/data/poker/
 
 # Training logs and outputs
