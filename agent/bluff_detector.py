@@ -19,13 +19,15 @@ from huggingface_hub import hf_hub_download
 # Lazy-loaded learned classifier (only on first use)
 _bluff_classifier_model = None
 _bluff_classifier_tokenizer = None
+_classifier_cache = None
 
 
 def _get_bluff_classifier():
     """Lazy-load bluff_classifier.pt and tokenizer from training/checkpoints."""
-    global _bluff_classifier_model, _bluff_classifier_tokenizer
-    if _bluff_classifier_model is not None:
-        return _bluff_classifier_model, _bluff_classifier_tokenizer
+    global _bluff_classifier_model, _bluff_classifier_tokenizer, _classifier_cache
+    if _classifier_cache is not None:
+        return _classifier_cache
+
     checkpoints_dir = Path(__file__).resolve().parent.parent / "training" / "checkpoints"
     negotiation_pt = checkpoints_dir / "bluff_classifier_negotiation.pt"
     default_pt = checkpoints_dir / "bluff_classifier.pt"
@@ -69,7 +71,8 @@ def _get_bluff_classifier():
         _bluff_classifier_model = _BluffClassifierModule()
         _bluff_classifier_model.load_state_dict(torch.load(pt_path, map_location="cpu", weights_only=True))
         _bluff_classifier_model.eval()
-        return _bluff_classifier_model, _bluff_classifier_tokenizer
+        _classifier_cache = (_bluff_classifier_model, _bluff_classifier_tokenizer)
+        return _classifier_cache
     except Exception:
         return None, None
 
