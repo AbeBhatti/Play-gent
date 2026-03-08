@@ -38,9 +38,9 @@ def _get_bluff_classifier():
         # HF Hub fallback: try to download negotiation checkpoint from the Spaces repo.
         try:
             downloaded = hf_hub_download(
-                repo_id="Abeee32t/ArbitrAgent",
+                repo_id="Abeee32t/arbitragent-bluff-classifier",
                 filename="bluff_classifier_negotiation.pt",
-                repo_type="space",
+                repo_type="model",
             )
             pt_path = Path(downloaded)
         except Exception:
