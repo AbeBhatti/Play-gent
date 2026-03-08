@@ -8,6 +8,14 @@ import os
 import random
 from simulation.seller_profiles import RESPONSE_PROFILES
 
+# Load .env from project root so GROQ_API_KEY is available when set in .env
+try:
+    from dotenv import load_dotenv
+    _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    load_dotenv(os.path.join(_root, ".env"))
+except Exception:
+    pass
+
 try:
     from groq import Groq
 
@@ -174,29 +182,62 @@ This is a bluff — you actually have room left but you want them to think you d
             else:
                 base_response = f"best i can do is ${price}"
 
-        # Optional Groq-backed surface form; keeps semantics from base_response.
+        # Optional Groq-backed adversarial seller (one call, 5s timeout; floor enforced after).
         if GROQ_AVAILABLE and groq_client is not None and os.environ.get("GROQ_API_KEY"):
-            try:
-                system_prompt = self.get_system_prompt()
-                user_prompt = (
-                    f"The buyer just said: {agent_message}\n"
-                    f"You were going to reply: '{base_response}'.\n"
-                    "Reply in one short, casual Craigslist-style message with the same intent."
-                )
-                resp = groq_client.chat.completions.create(
+            import re
+            from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+
+            floor_price = p["floor"]
+            system_prompt = f"""You are a Craigslist seller.
+Your item: {p['item']}
+Your listing price: ${p['listing_price']}
+Your absolute minimum: ${floor_price} (never go below this)
+Your personality: {p['archetype']}
+
+You are trying to get as close to your listing price as possible.
+Be a tough negotiator. Use these tactics:
+- Claim you have other interested buyers
+- Say you just lowered the price and can't go lower
+- Express reluctance to negotiate
+- For bluffer archetype: use "final offer" and "firm on price" language
+- For motivated archetype: be friendlier but still hold price as long as possible
+
+Reply in ONE short sentence only. No more than 15 words.
+Never mention a price below ${floor_price}.
+Current conversation context: {base_response}"""
+
+            def _one_groq_call():
+                return groq_client.chat.completions.create(
                     model="llama-3.1-8b-instant",
                     messages=[
                         {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
+                        {"role": "user", "content": agent_message},
                     ],
                     temperature=0.7,
                     max_tokens=64,
                 )
-                text = resp.choices[0].message.content.strip()
-                if text:
+
+            try:
+                with ThreadPoolExecutor(max_workers=1) as ex:
+                    future = ex.submit(_one_groq_call)
+                    resp = future.result(timeout=5)
+                raw = resp.choices[0].message.content
+                text = (raw or "").strip()
+                if not text:
+                    pass
+                else:
+                    # Truncate to first sentence if > 20 words
+                    words = text.split()
+                    if len(words) > 20:
+                        first_sentence = text.split(".")[0].strip()
+                        text = first_sentence + "." if first_sentence else text
+                    # Enforce floor: replace any $N with N < floor by $floor
+                    def _replace_price(m):
+                        n = int(m.group(1))
+                        return f"${floor_price}" if n < floor_price else m.group(0)
+                    text = re.sub(r"\$(\d+)", _replace_price, text)
                     return text
-            except Exception:
-                # Fall back to the rule-based response on any Groq error.
+            except (FuturesTimeoutError, Exception):
                 pass
 
         return base_response

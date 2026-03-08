@@ -29,14 +29,14 @@
       "type": "soft_inquiry",
       "seller_id": "seller_motivated_001",
       "agent_message": "hey, is the road bike still available? any room on price?",
-      "seller_response": "meet me at 118"
+      "seller_response": "I just lowered it to $118, no further discounts."
     },
     {
       "phase": 1,
       "type": "soft_inquiry",
       "seller_id": "seller_bluffer_camera",
       "agent_message": "hey, is the vintage film camera still available? any room on price?",
-      "seller_response": "cant do it for less than 42"
+      "seller_response": "I've had several inquiries, but I'm firm on the price at 45."
     },
     {
       "phase": 1,
@@ -51,22 +51,7 @@
       "type": "negotiation_turn",
       "seller_id": "seller_motivated_001",
       "agent_message": "still interested but my other option is looking more attractive \u2014 any movement?",
-      "seller_response": "meet me at 111"
-    },
-    {
-      "phase": 3,
-      "turn": 2,
-      "type": "bluff_detected",
-      "seller_id": "seller_bluffer_camera",
-      "message": "been getting interest at 40, cant go lower",
-      "signals": {
-        "timing_tell": 1.0,
-        "size_tell": 1.0,
-        "formulaic_tell": 1.0,
-        "pattern_tell": 0.0,
-        "bluff_score": 0.896950650215149,
-        "is_bluff": true
-      }
+      "seller_response": "I just had another buyer show interest, so I'm feeling good about selling at $120."
     },
     {
       "phase": 3,
@@ -74,7 +59,7 @@
       "type": "negotiation_turn",
       "seller_id": "seller_bluffer_camera",
       "agent_message": "still interested but my other option is looking more attractive \u2014 any movement?",
-      "seller_response": "been getting interest at 40, cant go lower"
+      "seller_response": "We've got another serious buyer ready to make an offer, so I'm firm on the price."
     },
     {
       "phase": 3,
@@ -87,10 +72,25 @@
     {
       "phase": 3,
       "turn": 3,
+      "type": "bluff_detected",
+      "seller_id": "seller_motivated_001",
+      "message": "I just dropped it to $120, can't go lower than that.",
+      "signals": {
+        "timing_tell": 1.0,
+        "size_tell": 1.0,
+        "formulaic_tell": 1.0,
+        "pattern_tell": 0.0,
+        "bluff_score": 0.7976562023162842,
+        "is_bluff": true
+      }
+    },
+    {
+      "phase": 3,
+      "turn": 3,
       "type": "negotiation_turn",
       "seller_id": "seller_motivated_001",
       "agent_message": "i have another buyer interested in the road bike, but i'd prefer to buy from you if we can make the numbers work. could you do a bit better on price?",
-      "seller_response": "i could do 109"
+      "seller_response": "I just dropped it to $120, can't go lower than that."
     },
     {
       "phase": 3,
@@ -99,11 +99,11 @@
       "seller_id": "seller_bluffer_camera",
       "message": "look i really cant go lower than $30, thats my final offer. been getting a lot of interest so",
       "signals": {
-        "timing_tell": 0.7,
+        "timing_tell": 1.0,
         "size_tell": 1.0,
         "formulaic_tell": 1.0,
-        "pattern_tell": 1.0,
-        "bluff_score": 0.9681276035308839,
+        "pattern_tell": 0.0,
+        "bluff_score": 0.8950024366378785,
         "is_bluff": true
       }
     },
@@ -126,10 +126,25 @@
     {
       "phase": 3,
       "turn": 4,
+      "type": "bluff_detected",
+      "seller_id": "seller_motivated_001",
+      "message": "I just lowered the price to $120, can't do any lower than that.",
+      "signals": {
+        "timing_tell": 0.7,
+        "size_tell": 1.0,
+        "formulaic_tell": 0.0,
+        "pattern_tell": 0.0,
+        "bluff_score": 0.6506689500808716,
+        "is_bluff": true
+      }
+    },
+    {
+      "phase": 3,
+      "turn": 4,
       "type": "negotiation_turn",
       "seller_id": "seller_motivated_001",
       "agent_message": "i have another buyer interested in the road bike, but i'd prefer to buy from you if we can make the numbers work. could you do a bit better on price?",
-      "seller_response": "i could do 103"
+      "seller_response": "I just lowered the price to $120, can't do any lower than that."
     },
     {
       "phase": 3,
@@ -142,7 +157,7 @@
         "size_tell": 1.0,
         "formulaic_tell": 1.0,
         "pattern_tell": 1.0,
-        "bluff_score": 0.9681276035308839,
+        "bluff_score": 0.9650024366378784,
         "is_bluff": true
       }
     },
@@ -160,7 +175,7 @@
       "type": "negotiation_turn",
       "seller_id": "seller_motivated_001",
       "agent_message": "i have another buyer interested in the road bike, but i'd prefer to buy from you if we can make the numbers work. could you do a bit better on price?",
-      "seller_response": "meet me at 96"
+      "seller_response": "I've got another serious buyer willing to meet the asking price, no wiggle room."
     },
     {
       "phase": 3,
@@ -173,7 +188,7 @@
         "size_tell": 1.0,
         "formulaic_tell": 1.0,
         "pattern_tell": 1.0,
-        "bluff_score": 0.9681276035308839,
+        "bluff_score": 0.9650024366378784,
         "is_bluff": true
       }
     },
@@ -192,12 +207,12 @@
       "buy_seller_id": "seller_motivated_001",
       "buy_item": "road bike",
       "trade_target_id": "buyer_2_road_bike",
-      "entry_cost": 96.0,
+      "entry_cost": 85.0,
       "exit_value": 180.0,
       "status": "confirmed",
       "confirmation_probability": 1.0,
       "seller_reliability": 0.9,
-      "score": 75.60000000000001
+      "score": 85.5
     },
     {
       "edge_id": "route_2",
@@ -229,13 +244,13 @@
       "edge_id": "route_1",
       "buy_seller_id": "seller_motivated_001",
       "trade_target_id": "buyer_2_road_bike",
-      "entry_cost": 96.0,
+      "entry_cost": 85.0,
       "exit_value": 180.0
     },
     "final_value": 180.0,
-    "profit": 84.0,
-    "return_multiple": 1.875,
-    "duration_seconds": 13.943956851959229
+    "profit": 95.0,
+    "return_multiple": 2.1176470588235294,
+    "duration_seconds": 21.68255591392517
   },
   "checkpoints": {
     "multi_thread_view": true,
