@@ -59,7 +59,7 @@ def unified_step(state, action):
         total = info.get("total", reward)
 
         # Bluff signal breakdown
-        bluff_detected = info.get("bluff_detected", blf > 0.35)
+        bluff_detected = info.get("bluff_detected") is True
         bluff_signals = info.get("bluff_signals", {})
         timing = bluff_signals.get("timing_tell", "—")
         size = bluff_signals.get("size_tell", "—")

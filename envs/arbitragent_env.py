@@ -165,7 +165,19 @@ class ArbitrAgentEnv(Env):
                 if any(w in action_lower for w in ["lying", "final", "non-negotiable", "counter", "$20", "$22", "$24", "$26", "non negotiable"]):
                     reward += 0.3
             reward = float(np.clip(reward, 0.0, 1.0))
-            return reward, signals_dict, True  # synthetic seller message is always bluff for UI
+            # Bluff-detected flag is now based on the USER'S ACTION, using the learned score plus call-the-bluff phrases.
+            user_learned = learned_bluff_score(action_lower, [])
+            bluff_call_phrases = [
+                "final offer",
+                "cant go lower",
+                "lowest you can go",
+                "firm on",
+                "been getting interest",
+            ]
+            action_has_bluff_call = any(phrase in action_lower for phrase in bluff_call_phrases)
+            bluff_detected = (user_learned > 0.5) or action_has_bluff_call
+
+            return reward, signals_dict, bluff_detected
         except Exception:
             return 0.0, {}, False
 

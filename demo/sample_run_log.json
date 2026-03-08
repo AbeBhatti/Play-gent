@@ -88,7 +88,7 @@
         "size_tell": 1.0,
         "formulaic_tell": 1.0,
         "pattern_tell": 1.0,
-        "bluff_score": 0.65,
+        "bluff_score": 0.9911464929580689,
         "is_bluff": true
       }
     },
@@ -119,6 +119,21 @@
     {
       "phase": 3,
       "turn": 4,
+      "type": "bluff_detected",
+      "seller_id": "seller_bluffer_camera",
+      "message": "look i really cant go lower than $30, thats my final offer. been getting a lot of interest so",
+      "signals": {
+        "timing_tell": 0.7,
+        "size_tell": 1.0,
+        "formulaic_tell": 1.0,
+        "pattern_tell": 1.0,
+        "bluff_score": 0.9611464929580689,
+        "is_bluff": true
+      }
+    },
+    {
+      "phase": 3,
+      "turn": 4,
       "type": "negotiation_turn",
       "seller_id": "seller_bluffer_camera",
       "agent_message": "i have another buyer interested in the vintage film camera, but i'd prefer to buy from you if we can make the numbers work. could you do a bit better on price?",
@@ -131,6 +146,21 @@
       "seller_id": "seller_motivated_001",
       "agent_message": "i have another buyer interested in the road bike, but i'd prefer to buy from you if we can make the numbers work. could you do a bit better on price?",
       "seller_response": null
+    },
+    {
+      "phase": 3,
+      "turn": 5,
+      "type": "bluff_detected",
+      "seller_id": "seller_bluffer_camera",
+      "message": "look i really cant go lower than $30, thats my final offer. been getting a lot of interest so",
+      "signals": {
+        "timing_tell": 0.7,
+        "size_tell": 1.0,
+        "formulaic_tell": 1.0,
+        "pattern_tell": 1.0,
+        "bluff_score": 0.9611464929580689,
+        "is_bluff": true
+      }
     },
     {
       "phase": 3,
@@ -190,7 +220,7 @@
     "final_value": 97.0,
     "profit": 77.0,
     "return_multiple": 1.7475728155339805,
-    "duration_seconds": 5.931564569473267
+    "duration_seconds": 5.846658706665039
   },
   "checkpoints": {
     "multi_thread_view": true,
