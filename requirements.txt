@@ -8,3 +8,5 @@ tqdm
 Diplomacy
 uuid
 rich
+openenv>=0.1.13
+gradio>=4.0
