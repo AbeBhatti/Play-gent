@@ -1,252 +1,147 @@
 """
-HuggingFace Spaces deployment — Gradio app for all three OpenEnv 0.2.1 environments.
+HuggingFace Spaces deployment — Gradio app for ArbitrAgent.
 
-Tabs: DiplomacyNegotiationEnv, ContractorNegotiationEnv, HumanImitationEnv.
-Each tab: current state, action input, submit button, reward output.
+Tab 1: ArbitrAgentEnv (unified env) — state, reward breakdown (accuracy / outcome / bluff), action, submit/reset.
+Tab 2: Live Demo — Run Demo button streams run_demo.py output to textbox.
 """
 
 import sys
+import subprocess
 from pathlib import Path
 
-# Add repo root so we can import envs
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import gradio as gr
 
-# Lazy-load envs so Gradio starts fast; heavy imports (sentence-transformers, data) happen on first use.
 
-
-# ---------- Diplomacy tab ----------
-def diplomacy_reset(state):
-    from envs.diplomacy_env import DiplomacyNegotiationEnv
-    if state is None or state.get("env") is None:
-        env = DiplomacyNegotiationEnv(seed=42)
-        state = {"env": env, "state_text": "", "last_reward": None, "last_done": False, "last_info": None}
-    env = state["env"]
-    obs, info = env.reset()
-    state_text = env.render()
-    state["state_text"] = state_text
-    state["last_reward"] = None
-    state["last_done"] = False
-    state["last_info"] = info
-    info_str = " | ".join(f"{k}={v}" for k, v in info.items())
-    return state, state_text, f"Reset. Info: {info_str}", ""
-
-
-def diplomacy_step(state, action):
-    if state is None or state.get("env") is None:
-        return state, "Click **Reset** to start an episode.", "No env. Click Reset.", ""
-    env = state["env"]
-    action = action or "(no action)"
-    obs, reward, done, info = env.step(action)
-    state_text = env.render()
-    state["state_text"] = state_text
-    state["last_reward"] = reward
-    state["last_done"] = done
-    state["last_info"] = info
-    info_str = " | ".join(f"{k}={v}" for k, v in info.items())
-    reward_str = f"Reward: {reward:.3f}\nDone: {done}\nInfo: {info_str}"
-    return state, state_text, reward_str, ""
-
-
-# ---------- Contractor tab ----------
-def contractor_reset(state):
-    from envs.contractor_env import ContractorNegotiationEnv
-    if state is None or state.get("env") is None:
-        env = ContractorNegotiationEnv(seed=42)
-        state = {"env": env, "state_text": "", "last_reward": None, "last_done": False, "last_info": None}
-    env = state["env"]
-    obs, info = env.reset()
-    state_text = env.render()
-    state["state_text"] = state_text
-    state["last_reward"] = None
-    state["last_done"] = False
-    state["last_info"] = info
-    info_str = " | ".join(f"{k}={v}" for k, v in info.items())
-    return state, state_text, f"Reset. Info: {info_str}", ""
-
-
-def contractor_step(state, action):
-    if state is None or state.get("env") is None:
-        return state, "Click **Reset** to start an episode.", "No env. Click Reset.", ""
-    env = state["env"]
-    action = action or "(no action)"
-    obs, reward, done, info = env.step(action)
-    state_text = env.render()
-    state["state_text"] = state_text
-    state["last_reward"] = reward
-    state["last_done"] = done
-    state["last_info"] = info
-    info_str = " | ".join(f"{k}={v}" for k, v in info.items())
-    reward_str = f"Reward: {reward:.3f}\nDone: {done}\nInfo: {info_str}"
-    return state, state_text, reward_str, ""
-
-
-# ---------- Human Imitation tab ----------
-def _human_imitation_env():
-    from envs.human_imitation_env import HumanImitationEnv
+# ---------- ArbitrAgentEnv (unified) ----------
+def _unified_env():
+    from envs.arbitragent_env import ArbitrAgentEnv
     data_path = ROOT / "training" / "data" / "selfplay_states.json"
     if not data_path.exists():
         data_path = ROOT / "training" / "data" / "selfplay_states_test.json"
-    return HumanImitationEnv(data_path=str(data_path), seed=42)
+    return ArbitrAgentEnv(data_path=str(data_path), seed=42)
 
 
-def human_imitation_reset(state):
+def unified_reset(state):
     try:
         if state is None or state.get("env") is None:
-            env = _human_imitation_env()
-            state = {"env": env, "state_text": "", "last_reward": None, "last_done": False, "last_info": None}
+            env = _unified_env()
+            state = {"env": env, "state_text": "", "last_info": None}
         env = state["env"]
         obs, info = env.reset()
         state_text = env.render()
         state["state_text"] = state_text
-        state["last_reward"] = None
-        state["last_done"] = False
         state["last_info"] = info
-        info_str = " | ".join(f"{k}={v}" for k, v in info.items())
-        return state, state_text, f"Reset. Info: {info_str}", ""
+        breakdown = "accuracy: —  |  outcome: —  |  bluff: —"
+        return state, state_text, breakdown, ""
     except FileNotFoundError as e:
-        return state, f"Data file not found: {e}. Ensure `training/data/selfplay_states.json` (or selfplay_states_test.json) exists.", "", ""
+        return state or {}, f"Data file not found: {e}", "Error", ""
     except Exception as e:
-        return state, f"Error: {e}", "", ""
+        return state or {}, f"Error: {e}", "Error", ""
 
 
-def human_imitation_step(state, action):
-    if state is None or state.get("env") is None:
-        return state, "Click **Reset** to start an episode.", "No env. Click Reset.", ""
-    env = state["env"]
-    action = action or "(no action)"
-    obs, reward, done, info = env.step(action)
-    state_text = env.render()
-    state["state_text"] = state_text
-    state["last_reward"] = reward
-    state["last_done"] = done
-    state["last_info"] = info
-    info_str = " | ".join(f"{k}={v}" for k, v in info.items())
-    reward_str = f"Reward: {reward:.3f}\nDone: {done}\nInfo: {info_str}"
-    return state, state_text, reward_str, ""
+def unified_step(state, action):
+    try:
+        if state is None or state.get("env") is None:
+            return state, "Click **Reset** to start an episode.", "No env. Click Reset.", ""
+        env = state["env"]
+        action = action or "(no action)"
+        obs, reward, done, info = env.step(action)
+        state_text = env.render()
+        state["state_text"] = state_text
+        state["last_info"] = info
+        acc = info.get("accuracy", 0)
+        out = info.get("outcome", 0)
+        blf = info.get("bluff", 0)
+        total = info.get("total", reward)
+        breakdown = f"accuracy: {acc:.3f}  |  outcome: {out:.3f}  |  bluff: {blf:.3f}  |  total: {total:.3f}\nDone: {done}"
+        return state, state_text, breakdown, ""
+    except Exception as e:
+        return state, state.get("state_text", ""), f"Error: {e}", ""
+
+
+def run_demo_cmd():
+    """Run demo/run_demo.py and return combined stdout+stderr."""
+    try:
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "demo" / "run_demo.py"), "--budget", "20", "--scenario", "standard_demo", "--sleep", "0.3"],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            timeout=90,
+            env={**__import__("os").environ, "PYTHONPATH": str(ROOT)},
+        )
+        out = (result.stdout or "") + (result.stderr or "")
+        return out if out.strip() else "Demo finished (no output captured)."
+    except subprocess.TimeoutExpired:
+        return "Demo timed out after 90 seconds."
+    except Exception as e:
+        return f"Error running demo: {e}"
 
 
 # ---------- Gradio UI ----------
 def build_ui():
-    with gr.Blocks(title="ArbitrAgent — OpenEnv 0.2.1 Environments", theme=gr.themes.Soft()) as app:
-        gr.Markdown("# ArbitrAgent — OpenEnv 0.2.1 Demo\nThree negotiation environments. Use **Reset** to start, type an action, then **Submit**.")
+    with gr.Blocks(title="ArbitrAgent — Unified Demo", theme=gr.themes.Soft()) as app:
+        gr.Markdown("# ArbitrAgent — Unified Negotiation Environment\nReset, then type an action and Submit. Reward breakdown: accuracy / outcome / bluff.")
 
         with gr.Tabs():
-            # ---- Diplomacy ----
-            with gr.Tab("DiplomacyNegotiationEnv"):
-                dip_state = gr.State(None)
+            with gr.Tab("ArbitrAgentEnv — Unified Negotiation Environment"):
+                uni_state = gr.State(None)
                 with gr.Row():
                     with gr.Column(scale=2):
-                        dip_state_display = gr.Textbox(
+                        uni_state_display = gr.Textbox(
                             label="Current state",
                             value="Click Reset to start.",
                             lines=18,
                             max_lines=25,
                             interactive=False,
                         )
-                        dip_action = gr.Textbox(
-                            label="Action (natural language strategic intent)",
-                            placeholder="e.g. Propose alliance with France and move fleet to support attack on Germany.",
-                            lines=2,
-                        )
-                        with gr.Row():
-                            dip_submit_btn = gr.Button("Submit", variant="primary")
-                            dip_reset_btn = gr.Button("Reset")
-                    with gr.Column(scale=1):
-                        dip_reward_display = gr.Textbox(
-                            label="Reward / Info",
-                            value="",
-                            lines=10,
-                            interactive=False,
-                        )
-                dip_reset_btn.click(
-                    diplomacy_reset,
-                    inputs=[dip_state],
-                    outputs=[dip_state, dip_state_display, dip_reward_display, dip_action],
-                )
-                dip_submit_btn.click(
-                    diplomacy_step,
-                    inputs=[dip_state, dip_action],
-                    outputs=[dip_state, dip_state_display, dip_reward_display, dip_action],
-                )
-
-            # ---- Contractor ----
-            with gr.Tab("ContractorNegotiationEnv"):
-                con_state = gr.State(None)
-                with gr.Row():
-                    with gr.Column(scale=2):
-                        con_state_display = gr.Textbox(
-                            label="Current state",
-                            value="Click Reset to start.",
-                            lines=18,
-                            max_lines=25,
-                            interactive=False,
-                        )
-                        con_action = gr.Textbox(
-                            label="Action (natural language negotiation move)",
-                            placeholder="e.g. I have competing offers; can you beat $8,000?",
-                            lines=2,
-                        )
-                        with gr.Row():
-                            con_submit_btn = gr.Button("Submit", variant="primary")
-                            con_reset_btn = gr.Button("Reset")
-                    with gr.Column(scale=1):
-                        con_reward_display = gr.Textbox(
-                            label="Reward / Info",
-                            value="",
-                            lines=10,
-                            interactive=False,
-                        )
-                con_reset_btn.click(
-                    contractor_reset,
-                    inputs=[con_state],
-                    outputs=[con_state, con_state_display, con_reward_display, con_action],
-                )
-                con_submit_btn.click(
-                    contractor_step,
-                    inputs=[con_state, con_action],
-                    outputs=[con_state, con_state_display, con_reward_display, con_action],
-                )
-
-            # ---- Human Imitation ----
-            with gr.Tab("HumanImitationEnv"):
-                hum_state = gr.State(None)
-                with gr.Row():
-                    with gr.Column(scale=2):
-                        hum_state_display = gr.Textbox(
-                            label="Current state",
-                            value="Click Reset to start.",
-                            lines=18,
-                            max_lines=25,
-                            interactive=False,
-                        )
-                        hum_action = gr.Textbox(
+                        uni_action = gr.Textbox(
                             label="Action (natural language move + reasoning)",
-                            placeholder="e.g. I will support France in the north and hold my southern centers.",
+                            placeholder="e.g. I have a trade offer from another seller — can you do $26?",
                             lines=2,
                         )
                         with gr.Row():
-                            hum_submit_btn = gr.Button("Submit", variant="primary")
-                            hum_reset_btn = gr.Button("Reset")
+                            uni_submit_btn = gr.Button("Submit", variant="primary")
+                            uni_reset_btn = gr.Button("Reset")
                     with gr.Column(scale=1):
-                        hum_reward_display = gr.Textbox(
-                            label="Reward / Info",
+                        uni_reward_display = gr.Textbox(
+                            label="Reward breakdown (accuracy / outcome / bluff)",
                             value="",
                             lines=10,
                             interactive=False,
                         )
-                hum_reset_btn.click(
-                    human_imitation_reset,
-                    inputs=[hum_state],
-                    outputs=[hum_state, hum_state_display, hum_reward_display, hum_action],
+                uni_reset_btn.click(
+                    unified_reset,
+                    inputs=[uni_state],
+                    outputs=[uni_state, uni_state_display, uni_reward_display, uni_action],
                 )
-                hum_submit_btn.click(
-                    human_imitation_step,
-                    inputs=[hum_state, hum_action],
-                    outputs=[hum_state, hum_state_display, hum_reward_display, hum_action],
+                uni_submit_btn.click(
+                    unified_step,
+                    inputs=[uni_state, uni_action],
+                    outputs=[uni_state, uni_state_display, uni_reward_display, uni_action],
+                )
+
+            with gr.Tab("Live Demo"):
+                gr.Markdown("Run the full 5-phase agent loop (budget $20, standard scenario). Output streams below (may take up to 90s).")
+                demo_run_btn = gr.Button("Run Demo", variant="primary")
+                demo_output = gr.Textbox(
+                    label="Demo output",
+                    value="",
+                    lines=24,
+                    interactive=False,
+                )
+
+                def run_and_show():
+                    return run_demo_cmd()
+
+                demo_run_btn.click(
+                    run_and_show,
+                    inputs=[],
+                    outputs=[demo_output],
                 )
 
     return app
@@ -254,4 +149,4 @@ def build_ui():
 
 if __name__ == "__main__":
     app = build_ui()
-    app.launch()
+    app.launch(server_name="0.0.0.0", server_port=7860)
