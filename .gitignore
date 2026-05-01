@@ -1,0 +1,9 @@
+checkpoints/
+training/data/
+logs/
+venv/
+__pycache__/
+*.pyc
+*.pth
+*.bin
+eval_run.log

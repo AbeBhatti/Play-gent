@@ -1,0 +1,129 @@
+# config.yaml — Single source of truth for all hyperparameters.
+# No hardcoded values anywhere in the codebase.
+
+# ── Paths ─────────────────────────────────────────────────────────────────────
+paths:
+  cicero_data:    "training/data/cicero_games"
+  poker_data:     "training/data/poker/IRCdata/holdem"
+  logs:           "logs"
+  checkpoints:
+    sft:              "checkpoints/sft"
+    grpo_diplomacy:   "checkpoints/grpo_diplomacy"   # added: missing from original
+    grpo_poker:       "checkpoints/grpo_poker"
+
+# ── Base Model ────────────────────────────────────────────────────────────────
+model:
+  name:       "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+  max_length: 512
+
+# ── SFT (Phase 1 — Cicero/Diplomacy data) ────────────────────────────────────
+sft:
+  batch_size:                   4
+  gradient_accumulation_steps:  8
+  learning_rate:                2.0e-5
+  weight_decay:                 0.01    # added: AdamW weight decay
+  num_epochs:                   3
+  max_length:                   512
+  context_messages:             3       # added: N previous messages included in prompt
+  save_steps:                   100
+  logging_steps:                10
+  bf16:                         true
+  train_val_split:              0.8
+
+# ── GRPO Diplomacy (Phase 2) ──────────────────────────────────────────────────
+# added: full section, was missing entirely
+grpo_diplomacy:
+  num_generations:              4       # reduced from 8 for speed
+  num_episodes:                 30      # reduced from 200 for speed
+  max_phases_per_episode:       15      # reduced from 60 for speed
+  learning_rate:                1.0e-6
+  max_completion_length:        256     # enough for ~10 orders + newlines
+  gradient_accumulation_steps:  4
+  save_steps:                   20      # save checkpoint every N episodes
+  logging_steps:                5
+  bf16:                         true
+  temperature:                  0.8     # sampling temperature for diverse generations
+  epsilon:                      0.2     # PPO clip ratio
+  kl_coeff:                     0.01    # KL penalty coefficient
+  max_grad_norm:                1.0
+  reward_win:                   1.0     # power has most SCs when game ends
+  reward_loss:                  -1.0    # power is eliminated
+  reward_draw:                  0.0     # all other phases
+
+# ── GRPO Poker (Phase 3) ──────────────────────────────────────────────────────
+# added: full section, was missing entirely
+grpo_poker:
+  num_generations:              4
+  max_hands:                    100000   # capped for manageable run (72 months available)
+  learning_rate:                5.0e-7  # halved from 1.0e-6 to slow policy drift
+  max_completion_length:        64      # fold/call/raise is short
+  gradient_accumulation_steps:  4
+  save_steps:                   500
+  logging_steps:                50
+  bf16:                         true
+  temperature:                  0.8
+  epsilon:                      0.2
+  kl_coeff:                     0.02   # doubled from 0.01 to tighten KL penalty
+  max_grad_norm:                1.0
+  reward_win:                   1.0     # net > 0 (won chips)
+  reward_loss:                  -1.0    # net < 0 (lost chips)
+  reward_neutral:               0.0     # net == 0
+  skip_neutral_hands:           true    # skip net==0 hands — no signal, wastes compute
+  top_p:                        0.9     # nucleus sampling — prevents degenerate token distributions
+
+# ── Poker Response Parsing ────────────────────────────────────────────────────
+poker:
+  default_action: "fold"
+  parse_keywords:
+    fold:    ["fold", "walk", "leave", "pass", "quit", "i'm out"]
+    call:    ["call", "accept", "deal", "agree", "check", "yes"]
+    counter: ["raise", "offer", "counter", "bid", "how about", "i'll do", "$"]
+
+# ── Diplomacy Engine ──────────────────────────────────────────────────────────
+diplomacy:
+  max_phases: 300
+
+# ── Marketplace Evaluation ────────────────────────────────────────────────────
+eval_marketplace:
+  num_scenarios:              50
+  starting_budget:            500
+  max_rounds:                 10
+  asking_price_min:           100
+  asking_price_max:           400
+  floor_pct_min:              0.60
+  floor_pct_max:              0.80
+  # accept_threshold is defined but not yet wired into any decision logic
+  accept_threshold:           0.05
+  seller_concession_pct:      0.05
+  default_action:             "fold"
+  price_as_raise:             true
+  anchor_pct:                 0.65
+  budget_filter:              true
+  budget_tolerance:           0.05
+  random_seed:                42
+  buyer_context_max_chars:    200   # chars of buyer text forwarded to seller LLM
+  seller_response_max_chars:  200   # chars of seller response included in buyer prompt
+  prompt_template: "You are negotiating. Floor: {floor}. Budget: {budget}. Seller asks: {seller_ask}.\nThe negotiation range is {floor} to {budget}. State your counter-offer as a percentage of this range or as a dollar amount.\nRound: {round}/{max_rounds}. Actions so far: {action_history}\nSeller says: {seller_response}\nYour move:"
+
+  # ── LLM Seller ───────────────────────────────────────────────────────────────
+  seller_model:              "meta-llama/Llama-3.1-8B-Instruct"
+  seller_max_new_tokens:     64
+  seller_temperature:        0.7
+  floor_enforcement:         true    # hard override: reject any accepted price below floor
+  seller_min_response:       "I cannot go below {floor_price}."
+  seller_opening_template:   "A buyer is interested in your item listed at {asking_price}. Give them a brief opening greeting."
+  seller_system_prompt:      "You are a seller on a marketplace. You have an item listed at {asking_price}. Your absolute minimum is {floor_price}. You MUST reject any offer below {floor_price}. Never accept below {floor_price} under any circumstances. Respond in 1-2 sentences. If the offer is at or above {floor_price}, accept with the word 'deal' or 'sold'. If below {floor_price}, counter with a price between {floor_price} and {asking_price}."
+  seller_accept_keywords:
+    - "deal"
+    - "sold"
+    - "accept"
+    - "agreed"
+    - "that works"
+    - "you got it"
+    - "i'll take it"
+    - "done"
+    - "sure"
+    - "yes"
+    - "ok"
+    - "okay"
+    - "fine"
