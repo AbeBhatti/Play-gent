@@ -10,6 +10,7 @@ Run via run_all.sh or directly:
 import copy
 import logging
 import random
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -50,14 +51,18 @@ def build_prompt(game: Game, power: str) -> str:
     centers = sorted(power_obj.centers)
     all_centers = {p: sorted(game.powers[p].centers) for p in game.powers}
     all_centers_str = " | ".join(f"{p}: {cs}" for p, cs in sorted(all_centers.items()))
+    units_str = ", ".join(units)
 
     return (
-        f"You are playing Diplomacy as {power}.\n"
-        f"Phase: {phase}\n"
-        f"Your units: {units}\n"
-        f"Your supply centers: {centers}\n"
-        f"All powers supply centers: {all_centers_str}\n"
-        f"Submit your orders one per line:\n"
+        f"DIPLOMACY ORDER SHEET — {power} — {phase}\n"
+        f"Units: {units_str}\n"
+        f"Centers: {', '.join(centers)}\n"
+        f"Board: {all_centers_str}\n"
+        f"\n"
+        f"Write one order per line in standard Diplomacy notation. No messages, no explanation.\n"
+        f"Notation examples: A PAR - BUR | F LON - NTH | A MUN H | A VIE S A BUD - GAL\n"
+        f"\n"
+        f"Orders:\n"
     )
 
 
@@ -75,17 +80,47 @@ def parse_orders(text: str, game: Game, power: str) -> list:
         valid_orders = {o for loc in orderable for o in possible.get(loc, [])}
 
         parsed = []
+        seen = set()
+
+        def _accept(order: str) -> None:
+            if order not in seen:
+                seen.add(order)
+                parsed.append(order)
+
         for line in text.strip().splitlines():
             line = line.strip()
             if not line:
                 continue
             if line in valid_orders:
-                parsed.append(line)
+                _accept(line)
             else:
                 # Try prefix match (model may add punctuation)
                 match = next((o for o in valid_orders if line.startswith(o[:6])), None)
                 if match:
-                    parsed.append(match)
+                    _accept(match)
+
+        # Secondary pass: regex extraction for when model outputs prose or messages.
+        # Catches patterns like "A PAR - BUR", "F LON H", "A VIE S A BUD - GAL"
+        # embedded in natural language. Only runs when the line pass found nothing.
+        if not parsed:
+            _ORDER_RE = re.compile(
+                r'(?<!\w)'
+                r'([AF] [A-Z]{3}(?:/[A-Z]{2})?'
+                r'(?:'
+                    r' - [A-Z]{3}(?:/[A-Z]{2})?'
+                    r'| H'
+                    r'| S [AF] [A-Z]{3}(?:/[A-Z]{2})?(?:(?: - [A-Z]{3}(?:/[A-Z]{2})?)?)'
+                    r'| C [AF] [A-Z]{3}(?:/[A-Z]{2})? - [A-Z]{3}(?:/[A-Z]{2})?'
+                r')?)'
+            )
+            for m in _ORDER_RE.finditer(text):
+                candidate = m.group(1).strip()
+                if candidate in valid_orders:
+                    _accept(candidate)
+                else:
+                    match = next((o for o in valid_orders if o.startswith(candidate[:6])), None)
+                    if match:
+                        _accept(match)
 
         # Fill any unordered locations with HOLD
         ordered_units = {o.split()[1] for o in parsed if len(o.split()) > 1}
@@ -162,7 +197,7 @@ def run_episode(model, ref_model, tokenizer, cfg, optimizer, rng: random.Random)
     accum_loss = torch.tensor(0.0, device=model.device)
     accum_steps = 0
 
-    while not game.is_game_done and phase_count < gcfg.max_phases_per_episode:
+    while not game.is_game_done:
         if game.powers[power].is_eliminated():
             break
 
@@ -204,8 +239,17 @@ def run_episode(model, ref_model, tokenizer, cfg, optimizer, rng: random.Random)
         # Reward based on game state after this phase
         if game.is_game_done:
             sc_counts = {p: len(game.powers[p].centers) for p in game.powers}
-            max_sc = max(sc_counts.values())
-            reward = gcfg.reward_win if sc_counts[power] == max_sc else gcfg.reward_loss
+            # Sort surviving (non-zero SC) counts descending; cutoff is 3rd place
+            surviving_counts = sorted(
+                [c for c in sc_counts.values() if c > 0], reverse=True
+            )
+            my_sc = sc_counts[power]
+            if my_sc == 0:
+                reward = gcfg.reward_loss
+            elif surviving_counts and my_sc >= surviving_counts[min(2, len(surviving_counts) - 1)]:
+                reward = gcfg.reward_win
+            else:
+                reward = gcfg.reward_loss
         elif game.powers[power].is_eliminated():
             reward = gcfg.reward_loss
         else:
@@ -274,7 +318,7 @@ def main() -> None:
         p.requires_grad_(False)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=gcfg.learning_rate)
-    rng = random.Random(42)
+    rng = random.Random(gcfg.random_seed)
     ckpt_dir = Path(cfg.paths.checkpoints.grpo_diplomacy)
     ckpt_dir.mkdir(parents=True, exist_ok=True)
 
